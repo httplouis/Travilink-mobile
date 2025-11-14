@@ -12,6 +12,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  fetchProfileByUserId: (userId: string) => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -120,6 +121,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       const userProfile = await fetchProfile(user.id);
       setProfile(userProfile);
+    }
+  };
+  
+  // Expose fetchProfile for direct use in callbacks (bypassing user dependency)
+  const fetchProfileByUserId = async (userId: string) => {
+    try {
+      // Add timeout to prevent hanging - max 2 seconds
+      const profilePromise = fetchProfile(userId);
+      const timeoutPromise = new Promise<UserProfile | null>((_, reject) => 
+        setTimeout(() => {
+          console.warn('[AuthContext] fetchProfileByUserId timeout after 2 seconds');
+          reject(new Error('Profile fetch timeout'));
+        }, 2000)
+      );
+      
+      const userProfile = await Promise.race([profilePromise, timeoutPromise]);
+      if (userProfile) {
+        setProfile(userProfile);
+      }
+      return userProfile;
+    } catch (error) {
+      console.error('[AuthContext] fetchProfileByUserId error:', error);
+      // Return null on error/timeout - don't block login
+      return null;
     }
   };
 
@@ -288,6 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signOut,
         refreshProfile,
+        fetchProfileByUserId,
       }}
     >
       {children}

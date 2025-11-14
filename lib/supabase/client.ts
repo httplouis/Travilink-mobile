@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -22,8 +23,15 @@ const storageAdapter = {
         }
         return null;
       } else {
-        // Use SecureStore on native
-        return await SecureStore.getItemAsync(key);
+        // Try SecureStore first, then AsyncStorage (for large values)
+        try {
+          const value = await SecureStore.getItemAsync(key);
+          if (value) return value;
+        } catch (secureStoreError) {
+          // SecureStore might not have the value (or it's too large), try AsyncStorage
+        }
+        // Fallback to AsyncStorage (for large values stored there)
+        return await AsyncStorage.getItem(key);
       }
     } catch (error) {
       console.error('Error getting item from storage:', error);
@@ -38,21 +46,21 @@ const storageAdapter = {
           window.localStorage.setItem(key, value);
         }
       } else {
-        // Use SecureStore on native
-        // Note: SecureStore has a 2048 byte limit on iOS
-        // Supabase session data can be larger, so we try SecureStore first
-        // If it fails silently (value too large), the session won't persist
-        // but it will still work for the current session
-        try {
-          if (value.length > 2048) {
-            console.warn(`[Supabase Storage] Value for key "${key}" is ${value.length} bytes, exceeding SecureStore limit of 2048 bytes. Session may not persist.`);
+        // On native, use AsyncStorage for large values (>2048 bytes) due to SecureStore limit
+        // For smaller values, try SecureStore first, fallback to AsyncStorage
+        if (value.length > 2048) {
+          // Use AsyncStorage for large values (no size limit)
+          console.log(`[Supabase Storage] Using AsyncStorage for large value (${value.length} bytes) for key "${key}"`);
+          await AsyncStorage.setItem(key, value);
+        } else {
+          // Try SecureStore for smaller values (more secure)
+          try {
+            await SecureStore.setItemAsync(key, value);
+          } catch (secureStoreError: any) {
+            // Fallback to AsyncStorage if SecureStore fails
+            console.warn(`[Supabase Storage] SecureStore failed for key "${key}", using AsyncStorage:`, secureStoreError.message);
+            await AsyncStorage.setItem(key, value);
           }
-          await SecureStore.setItemAsync(key, value);
-        } catch (secureStoreError: any) {
-          // If SecureStore fails due to size, log but don't throw
-          // The session will work but won't persist across app restarts
-          console.error(`[Supabase Storage] Failed to store large value in SecureStore (${value.length} bytes):`, secureStoreError.message);
-          // Session will still be available in memory for current session
         }
       }
     } catch (error) {
@@ -67,8 +75,17 @@ const storageAdapter = {
           window.localStorage.removeItem(key);
         }
       } else {
-        // Use SecureStore on native
-        await SecureStore.deleteItemAsync(key);
+        // Remove from both SecureStore and AsyncStorage (in case it's in either)
+        try {
+          await SecureStore.deleteItemAsync(key);
+        } catch (secureStoreError) {
+          // Ignore if not in SecureStore
+        }
+        try {
+          await AsyncStorage.removeItem(key);
+        } catch (asyncStorageError) {
+          // Ignore if not in AsyncStorage
+        }
       }
     } catch (error) {
       console.error('Error removing item from storage:', error);
