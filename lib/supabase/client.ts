@@ -39,7 +39,21 @@ const storageAdapter = {
         }
       } else {
         // Use SecureStore on native
-        await SecureStore.setItemAsync(key, value);
+        // Note: SecureStore has a 2048 byte limit on iOS
+        // Supabase session data can be larger, so we try SecureStore first
+        // If it fails silently (value too large), the session won't persist
+        // but it will still work for the current session
+        try {
+          if (value.length > 2048) {
+            console.warn(`[Supabase Storage] Value for key "${key}" is ${value.length} bytes, exceeding SecureStore limit of 2048 bytes. Session may not persist.`);
+          }
+          await SecureStore.setItemAsync(key, value);
+        } catch (secureStoreError: any) {
+          // If SecureStore fails due to size, log but don't throw
+          // The session will work but won't persist across app restarts
+          console.error(`[Supabase Storage] Failed to store large value in SecureStore (${value.length} bytes):`, secureStoreError.message);
+          // Session will still be available in memory for current session
+        }
       }
     } catch (error) {
       console.error('Error setting item in storage:', error);

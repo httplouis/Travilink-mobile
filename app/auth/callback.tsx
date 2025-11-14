@@ -20,21 +20,17 @@ export default function AuthCallback() {
     }
   }, [session]);
 
-  // If we already have a session, redirect immediately using Redirect component
-  if (session && hasProcessedRef.current) {
-    console.log('[auth/callback] Session exists, redirecting to dashboard...');
-    return <Redirect href="/(tabs)/dashboard" />;
-  }
-
-  // If we should redirect, use Redirect component (more reliable than router.replace)
-  if (shouldRedirect) {
-    return <Redirect href="/(tabs)/dashboard" />;
-  }
-
+  // Main callback processing effect - ALL hooks must be declared before any conditional returns
   useEffect(() => {
-    // Prevent re-processing after successful redirect
+    // CRITICAL: Check hasProcessedRef BEFORE anything else
+    // If we've already processed, just wait for redirect (don't process again)
     if (hasProcessedRef.current) {
-      console.log('[auth/callback] Already processed, skipping...');
+      console.log('[auth/callback] Already processed, waiting for redirect...');
+      // If we already have a session after processing, redirect immediately
+      if (session) {
+        console.log('[auth/callback] Session available after processing, redirecting...');
+        setShouldRedirect(true);
+      }
       return;
     }
 
@@ -43,6 +39,12 @@ export default function AuthCallback() {
       console.log('[auth/callback] Session exists but no params, redirecting...');
       hasProcessedRef.current = true;
       setShouldRedirect(true);
+      return;
+    }
+
+    // Early exit if no params and no session - might be a re-render
+    if (Object.keys(params).length === 0 && !session) {
+      console.log('[auth/callback] No params and no session, might be re-render, waiting...');
       return;
     }
 
@@ -139,6 +141,10 @@ export default function AuthCallback() {
         if (accessToken) {
           console.log('[auth/callback] Setting session from access_token (platform:', Platform.OS, ')');
           
+          // CRITICAL: Mark as processed IMMEDIATELY to prevent re-processing on re-renders
+          // This must happen BEFORE async operations to prevent race conditions
+          hasProcessedRef.current = true;
+          
           // Extract other tokens from hash or params
           let refreshToken = '';
           if (hashParams) {
@@ -155,18 +161,23 @@ export default function AuthCallback() {
 
           if (sessionError || !sessionData.session) {
             console.error('[auth/callback] Failed to set session:', sessionError);
+            // Reset hasProcessedRef on error so user can retry
+            hasProcessedRef.current = false;
             router.replace('/(auth)/sign-in?error=' + encodeURIComponent(sessionError?.message || 'failed_to_set_session'));
             return;
           }
 
-          console.log('[auth/callback] Session set successfully');
-          
-          // Mark as processed to prevent re-processing
-          hasProcessedRef.current = true;
+          console.log('[auth/callback] Session set successfully, session ID:', sessionData.session?.user?.id);
           
           // Clear hash on web before redirecting
           if (Platform.OS === 'web' && typeof window !== 'undefined') {
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+          
+          // Verify session is accessible
+          const { data: verifySession } = await supabase.auth.getSession();
+          if (verifySession.session) {
+            console.log('[auth/callback] Session verified, proceeding with redirect...');
           }
           
           // Refresh profile, but don't wait if it fails - just redirect
@@ -176,25 +187,39 @@ export default function AuthCallback() {
             console.warn('[auth/callback] Profile refresh failed, but continuing:', profileError);
           }
           
+          // Small delay to ensure AuthContext has updated
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
           // Use Redirect component instead of router.replace for more reliable navigation
           setShouldRedirect(true);
           
-          // Fallback: Force redirect after a short delay (React state updates are async)
+          // Force redirect after a short delay to ensure state update
           setTimeout(() => {
-            console.log('[auth/callback] Fallback redirect after delay...');
             setShouldRedirect(true);
-          }, 300);
+          }, 100);
           
           return;
         }
 
         // Native flow: exchange code for session
         if (!code) {
+          // If we've already processed, don't redirect to sign-in - just wait
+          if (hasProcessedRef.current) {
+            console.log('[auth/callback] Already processed, waiting for session...');
+            return;
+          }
+          
           // If we already have a session and no params, just redirect (might be a re-render after redirect)
           if (session) {
             console.log('[auth/callback] No code/token but session exists, redirecting to dashboard...');
             hasProcessedRef.current = true;
             setShouldRedirect(true);
+            return;
+          }
+          
+          // If we have no params and no session, this might be a re-render - don't process
+          if (Object.keys(params).length === 0) {
+            console.log('[auth/callback] No params, no session, no code - likely re-render, skipping...');
             return;
           }
           
@@ -211,20 +236,29 @@ export default function AuthCallback() {
 
         console.log('[auth/callback] Exchanging code for session...');
         
+        // CRITICAL: Mark as processed IMMEDIATELY to prevent re-processing on re-renders
+        // This must happen BEFORE async operations to prevent race conditions
+        hasProcessedRef.current = true;
+        
         // Exchange code for session
         const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
 
         if (sessionError) {
           console.error('[auth/callback] Session error:', sessionError);
+          // Reset hasProcessedRef on error so user can retry
+          hasProcessedRef.current = false;
           router.replace('/(auth)/sign-in?error=' + encodeURIComponent(sessionError.message));
           return;
         }
 
         if (data.session) {
-          console.log('[auth/callback] Session created successfully');
+          console.log('[auth/callback] Session created successfully, session ID:', data.session?.user?.id);
           
-          // Mark as processed to prevent re-processing
-          hasProcessedRef.current = true;
+          // Verify session is accessible
+          const { data: verifySession } = await supabase.auth.getSession();
+          if (verifySession.session) {
+            console.log('[auth/callback] Session verified, proceeding with redirect...');
+          }
           
           // Refresh profile, but don't wait if it fails - just redirect
           try {
@@ -233,14 +267,16 @@ export default function AuthCallback() {
             console.warn('[auth/callback] Profile refresh failed, but continuing:', profileError);
           }
           
+          // Small delay to ensure AuthContext has updated
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
           // Use Redirect component instead of router.replace for more reliable navigation
           setShouldRedirect(true);
           
-          // Fallback: Force redirect after a short delay (React state updates are async)
+          // Force redirect after a short delay to ensure state update
           setTimeout(() => {
-            console.log('[auth/callback] Fallback redirect after delay (code flow)...');
             setShouldRedirect(true);
-          }, 300);
+          }, 100);
         } else {
           console.error('[auth/callback] No session in response');
           router.replace('/(auth)/sign-in?error=no_session');
@@ -260,6 +296,29 @@ export default function AuthCallback() {
       isProcessingRef.current = false;
     };
   }, [params, router, refreshProfile, session]);
+
+  // NOW we can do conditional returns - all hooks have been declared
+  // CRITICAL: If we've already processed and have a session, redirect immediately
+  // This prevents re-processing on re-renders with empty params
+  if (hasProcessedRef.current && session) {
+    console.log('[auth/callback] Already processed with session, redirecting...');
+    return <Redirect href="/(tabs)/dashboard" />;
+  }
+
+  // If we should redirect, use Redirect component (more reliable than router.replace)
+  if (shouldRedirect) {
+    return <Redirect href="/(tabs)/dashboard" />;
+  }
+
+  // If we've already processed but no session yet, just wait (don't process again)
+  if (hasProcessedRef.current) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#7a0019" />
+        <Text style={styles.text}>Completing sign in...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
