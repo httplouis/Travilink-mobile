@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -131,7 +131,7 @@ export default function CalendarScreen() {
     };
   });
 
-  const handleDatePress = (day: { dateString: string }) => {
+  const handleDatePress = (day: DateObject) => {
     const dateBookings = bookingsByDate[day.dateString] || [];
     setSelectedDate(day.dateString);
     setSelectedBookings(dateBookings);
@@ -187,33 +187,43 @@ export default function CalendarScreen() {
         </View>
       ) : (
         <ScrollView style={styles.scrollView}>
-          <Calendar
-            current={selectedDate}
-            onDayPress={handleDatePress}
-            markedDates={markedDates}
-            markingType="custom"
-            theme={{
-              backgroundColor: '#fff',
-              calendarBackground: '#fff',
-              textSectionTitleColor: '#6b7280',
-              selectedDayBackgroundColor: '#7a0019',
-              selectedDayTextColor: '#fff',
-              todayTextColor: '#7a0019',
-              dayTextColor: '#111827',
-              textDisabledColor: '#d1d5db',
-              dotColor: '#7a0019',
-              selectedDotColor: '#fff',
-              arrowColor: '#7a0019',
-              monthTextColor: '#111827',
-              textDayFontWeight: '600',
-              textMonthFontWeight: '700',
-              textDayHeaderFontWeight: '600',
-              textDayFontSize: 14,
-              textMonthFontSize: 18,
-              textDayHeaderFontSize: 12,
-            }}
-            style={styles.calendar}
-          />
+          <View style={styles.calendarContainer}>
+            <Calendar
+              current={selectedDate}
+              onDayPress={handleDatePress}
+              markedDates={markedDates}
+              markingType="custom"
+              enableSwipeMonths={true}
+              hideExtraDays={true}
+              disableMonthChange={false}
+              firstDay={0}
+              showWeekNumbers={false}
+              onMonthChange={(month) => {
+                // Handle month change if needed
+              }}
+              theme={{
+                backgroundColor: '#fff',
+                calendarBackground: '#fff',
+                textSectionTitleColor: '#6b7280',
+                selectedDayBackgroundColor: '#7a0019',
+                selectedDayTextColor: '#fff',
+                todayTextColor: '#7a0019',
+                dayTextColor: '#111827',
+                textDisabledColor: '#d1d5db',
+                dotColor: '#7a0019',
+                selectedDotColor: '#fff',
+                arrowColor: '#7a0019',
+                monthTextColor: '#111827',
+                textDayFontWeight: '600',
+                textMonthFontWeight: '700',
+                textDayHeaderFontWeight: '600',
+                textDayFontSize: 14,
+                textMonthFontSize: 18,
+                textDayHeaderFontSize: 12,
+              }}
+              style={styles.calendar}
+            />
+          </View>
 
           {/* Legend */}
           <View style={styles.legend}>
@@ -293,25 +303,25 @@ export default function CalendarScreen() {
                       </Text>
                       <View style={styles.bookingDetails}>
                         <View style={styles.bookingDetail}>
-                          <Ionicons name="location" size={16} color="#6b7280" />
+                          <Ionicons name="location-outline" size={16} color="#6b7280" />
                           <Text style={styles.bookingDetailText}>
                             {booking.destination}
                           </Text>
                         </View>
                         <View style={styles.bookingDetail}>
-                          <Ionicons name="car" size={16} color="#6b7280" />
+                          <Ionicons name="car-outline" size={16} color="#6b7280" />
                           <Text style={styles.bookingDetailText}>
                             {booking.vehicle} - {booking.vehicleName}
                           </Text>
                         </View>
                         <View style={styles.bookingDetail}>
-                          <Ionicons name="person" size={16} color="#6b7280" />
+                          <Ionicons name="person-outline" size={16} color="#6b7280" />
                           <Text style={styles.bookingDetailText}>
                             {booking.driver}
                           </Text>
                         </View>
                         <View style={styles.bookingDetail}>
-                          <Ionicons name="time" size={16} color="#6b7280" />
+                          <Ionicons name="time-outline" size={16} color="#6b7280" />
                           <Text style={styles.bookingDetailText}>
                             {booking.departAt} → {booking.returnAt}
                           </Text>
@@ -380,8 +390,18 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  calendar: {
+  calendarContainer: {
     margin: 16,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  calendar: {
     borderRadius: 12,
     backgroundColor: '#fff',
     padding: 8,

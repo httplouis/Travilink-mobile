@@ -288,6 +288,36 @@ If you see a white screen when running `npm run web`:
 - Verify user exists in `users` table
 - Check console for auth errors
 
+### Expo Dev Server Timeout / Connection Issues
+
+If you see "The request timed out" when trying to connect to the Expo dev server:
+
+**Solution 1: Use Tunnel Mode (Recommended)**
+```bash
+npm run start:tunnel
+```
+This uses Expo's tunnel service to bypass network connectivity issues. Works even if your device and computer are on different networks.
+
+**Solution 2: Check Network Connection**
+- Ensure your device and computer are on the same Wi-Fi network
+- Try disabling VPN if active
+- Check firewall settings (may need to allow port 8081)
+
+**Solution 3: Use LAN Mode with Different IP**
+- Find your computer's IP address: `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
+- Ensure the IP matches what's shown in the error (`192.168.68.140` in your case)
+- If IP changed, restart the Expo server: `npm start`
+
+**Solution 4: Clear Cache and Restart**
+```bash
+npm start -- --clear
+```
+
+**Solution 5: Check Port Availability**
+- Ensure port 8081 is not blocked by firewall
+- Check if another process is using port 8081
+- On Windows, you can check with: `netstat -ano | findstr :8081`
+
 ### Calendar Not Showing
 
 - Check that user has approved requests

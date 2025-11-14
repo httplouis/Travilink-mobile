@@ -190,7 +190,14 @@ export default function ProfileScreen() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleSignOut}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push('/(tabs)/profile/settings')}
+        >
+          <Ionicons name="settings-outline" size={20} color="#7a0019" />
+          <Text style={styles.actionButtonText}>Settings</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionButton, styles.actionButtonDanger]} onPress={handleSignOut}>
           <Ionicons name="log-out" size={20} color="#dc2626" />
           <Text style={styles.actionButtonTextDanger}>Sign Out</Text>
         </TouchableOpacity>
@@ -335,6 +342,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 32,
     paddingHorizontal: 16,
+    gap: 12,
   },
   actionButton: {
     flexDirection: 'row',
@@ -345,7 +353,15 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  actionButtonDanger: {
     borderColor: '#fee2e2',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#7a0019',
   },
   actionButtonTextDanger: {
     fontSize: 16,

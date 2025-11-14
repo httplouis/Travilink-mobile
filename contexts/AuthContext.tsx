@@ -125,8 +125,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Validate email format (support both @mseuf.edu.ph and @student.mseuf.edu.ph)
+      const emailLower = email.toLowerCase().trim();
+      const isValidEmail = 
+        emailLower.endsWith('@mseuf.edu.ph') || 
+        emailLower.endsWith('@student.mseuf.edu.ph');
+      
+      if (!isValidEmail) {
+        throw new Error('Please use your institutional email (@mseuf.edu.ph or @student.mseuf.edu.ph)');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: emailLower,
         password,
       });
 
@@ -137,8 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(userProfile);
       }
 
-      // Navigate to tabs after successful login
-      router.replace('/(tabs)/submissions');
+      // Navigate to dashboard after successful login
+      router.replace('/(tabs)/dashboard');
     } catch (error: any) {
       console.error('Sign in error:', error);
       throw error;
@@ -160,12 +170,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // Get initial session
+    // Get initial session with timeout
     const initializeAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Set a timeout to prevent infinite loading
+        timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.warn('[AuthContext] Initialization timeout, setting loading to false');
+            setLoading(false);
+          }
+        }, 10000); // 10 second timeout
+
+        // Wrap getSession in a timeout promise to prevent hanging
+        const sessionPromise = supabase.auth.getSession();
+        const sessionTimeoutPromise = new Promise<{ data: { session: null }, error: null }>((resolve) => 
+          setTimeout(() => {
+            console.warn('[AuthContext] getSession timeout, resolving with no session');
+            resolve({ data: { session: null }, error: null });
+          }, 8000) // 8 second timeout for getSession
+        );
+
+        const result = await Promise.race([sessionPromise, sessionTimeoutPromise]);
+        const { data: { session }, error } = result || { data: { session: null }, error: null };
         
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+
         if (!mounted) return;
 
         if (error) {
@@ -178,9 +212,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          const userProfile = await fetchProfile(session.user.id);
-          if (mounted) {
-            setProfile(userProfile);
+          // Fetch profile with timeout
+          try {
+            const profilePromise = fetchProfile(session.user.id);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Profile fetch timeout')), 8000)
+            );
+            
+            const userProfile = await Promise.race([profilePromise, timeoutPromise]) as UserProfile | null;
+            if (mounted) {
+              setProfile(userProfile);
+            }
+          } catch (profileError) {
+            console.error('[AuthContext] Profile fetch error:', profileError);
+            if (mounted) {
+              setProfile(null);
+            }
           }
         } else {
           setProfile(null);
@@ -188,6 +235,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('[AuthContext] Initialization error:', error);
       } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         if (mounted) {
           setLoading(false);
         }
@@ -221,6 +271,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       subscription.unsubscribe();
     };
   }, []);

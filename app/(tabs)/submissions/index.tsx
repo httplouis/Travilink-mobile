@@ -86,12 +86,12 @@ export default function SubmissionsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>My Papers</Text>
-          <Text style={styles.headerSubtitle}>
-            {requests.length} request{requests.length !== 1 ? 's' : ''}
-          </Text>
-        </View>
+          <View>
+            <Text style={styles.headerTitle}>My Requests</Text>
+            <Text style={styles.headerSubtitle}>
+              {requests.length} request{requests.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
         <View style={styles.autoRefreshIndicator}>
           <View style={styles.indicatorDot} />
           <Text style={styles.indicatorText}>Live</Text>

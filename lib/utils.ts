@@ -42,6 +42,13 @@ export function extractTime(isoString: string): string {
 }
 
 /**
+ * Format time for display (HH:mm format)
+ */
+export function formatTime(isoString: string): string {
+  return extractTime(isoString);
+}
+
+/**
  * Format time ago (e.g., "2h ago", "1d ago")
  */
 export function formatTimeAgo(dateString: string): string {

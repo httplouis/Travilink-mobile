@@ -30,6 +30,7 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="request/[id]" />
+              <Stack.Screen name="auth/callback" />
             </Stack>
           </AuthProvider>
         </QueryClientProvider>
