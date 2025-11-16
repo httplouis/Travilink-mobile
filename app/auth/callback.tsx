@@ -107,16 +107,29 @@ export default function AuthCallback() {
             return;
           }
 
-          console.log('[auth/callback] Session set successfully! Redirecting immediately...');
+          console.log('[auth/callback] Session set successfully! Waiting for persistence...');
           
-          // Clear hash on web
-          if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          // Wait a moment to ensure session is persisted to storage
+          // This allows AuthContext to pick up the session change
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Verify session is still set (in case of race conditions)
+          const { data: verifyData } = await supabase.auth.getSession();
+          if (verifyData.session) {
+            console.log('[auth/callback] Session verified, redirecting to dashboard...');
+            
+            // Clear hash on web
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+            
+            hasProcessedRef.current = true;
+            router.replace('/(tabs)/dashboard');
+          } else {
+            console.error('[auth/callback] Session not persisted');
+            hasProcessedRef.current = true;
+            router.replace('/(auth)/sign-in?error=session_not_persisted');
           }
-          
-          // Mark as processed and redirect IMMEDIATELY
-          hasProcessedRef.current = true;
-          router.replace('/(tabs)/dashboard');
           return;
         }
 
@@ -140,10 +153,23 @@ export default function AuthCallback() {
         }
 
         if (data.session) {
-          console.log('[auth/callback] Session created successfully! Redirecting immediately...');
-          // Mark as processed and redirect IMMEDIATELY
-          hasProcessedRef.current = true;
-          router.replace('/(tabs)/dashboard');
+          console.log('[auth/callback] Session created successfully! Waiting for persistence...');
+          
+          // Wait a moment to ensure session is persisted to storage
+          // This allows AuthContext to pick up the session change
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Verify session is still set (in case of race conditions)
+          const { data: verifyData } = await supabase.auth.getSession();
+          if (verifyData.session) {
+            console.log('[auth/callback] Session verified, redirecting to dashboard...');
+            hasProcessedRef.current = true;
+            router.replace('/(tabs)/dashboard');
+          } else {
+            console.error('[auth/callback] Session not persisted');
+            hasProcessedRef.current = true;
+            router.replace('/(auth)/sign-in?error=session_not_persisted');
+          }
         } else {
           console.error('[auth/callback] No session in response');
           hasProcessedRef.current = true;
@@ -165,7 +191,7 @@ export default function AuthCallback() {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color="#7a0019" />
-      <Text style={styles.text}>Completing sign in...</Text>
+      <Text style={styles.text}>Logging in...</Text>
     </View>
   );
 }

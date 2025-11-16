@@ -10,6 +10,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { Platform } from 'react-native';
+import NavigationHeader from '@/components/NavigationHeader';
+import CustomTabBar from '@/components/CustomTabBar';
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuth();
@@ -25,14 +28,14 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-      </View>
+    <View style={styles.container}>
+      <NavigationHeader
+        title="Settings"
+        showNotification={false}
+        showMenu={false}
+        showBack={true}
+      />
+    <ScrollView style={styles.scrollView}>
 
       {/* Account Section */}
       <View style={styles.section}>
@@ -115,19 +118,17 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Sign Out */}
-      <View style={styles.section}>
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Version */}
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>TraviLink Mobile v1.0.0</Text>
       </View>
+      
+      {/* Bottom padding to account for navbar */}
+      <View style={{ height: Platform.OS === 'ios' ? 100 : 80 }} />
     </ScrollView>
+    <CustomTabBar />
+    </View>
   );
 }
 
@@ -136,21 +137,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  backButton: {
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
+  scrollView: {
+    flex: 1,
   },
   section: {
     backgroundColor: '#fff',

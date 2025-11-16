@@ -18,6 +18,16 @@ export interface DashboardVehicle {
   status: string;
 }
 
+export interface DashboardDriver {
+  id: string;
+  name: string;
+  email?: string;
+  phone_number?: string;
+  profile_picture?: string;
+  status?: string;
+  position_title?: string;
+}
+
 export interface DashboardTrip {
   id: string;
   request_number: string;
@@ -95,6 +105,24 @@ export function useDashboard(userId: string) {
     refetchInterval: 60000, // Refresh every minute
   });
 
+  // Fetch available drivers
+  const driversQuery = useQuery({
+    queryKey: ['dashboard-drivers'],
+    queryFn: async (): Promise<DashboardDriver[]> => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email, phone_number, profile_picture, status, position_title')
+        .eq('role', 'driver')
+        .eq('status', 'active')
+        .order('name', { ascending: true })
+        .limit(6);
+
+      if (error) throw error;
+      return (data || []) as DashboardDriver[];
+    },
+    refetchInterval: 60000, // Refresh every minute
+  });
+
   // Fetch upcoming trips
   const tripsQuery = useQuery({
     queryKey: ['dashboard-trips', userId],
@@ -161,12 +189,15 @@ export function useDashboard(userId: string) {
     kpisLoading: kpisQuery.isLoading,
     vehicles: vehiclesQuery.data || [],
     vehiclesLoading: vehiclesQuery.isLoading,
+    drivers: driversQuery.data || [],
+    driversLoading: driversQuery.isLoading,
     trips: tripsQuery.data || [],
     tripsLoading: tripsQuery.isLoading,
-    isLoading: kpisQuery.isLoading || vehiclesQuery.isLoading || tripsQuery.isLoading,
+    isLoading: kpisQuery.isLoading || vehiclesQuery.isLoading || driversQuery.isLoading || tripsQuery.isLoading,
     refetch: () => {
       kpisQuery.refetch();
       vehiclesQuery.refetch();
+      driversQuery.refetch();
       tripsQuery.refetch();
     },
   };

@@ -293,7 +293,9 @@ export default function RequestStatusTracker({
                   )}
                   
                   {stageStatus === 'pending' && (
-                    <Text style={styles.waitingText}>Waiting</Text>
+                    <View style={styles.waitingBadge}>
+                      <Text style={styles.waitingText}>Waiting</Text>
+                    </View>
                   )}
                 </View>
               </View>
@@ -468,6 +470,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#2563eb',
+  },
+  waitingBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   waitingText: {
     fontSize: 12,

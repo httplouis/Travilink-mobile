@@ -8,11 +8,16 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  ScrollView,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { useVehicles } from '@/hooks/useVehicles';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Vehicle } from '@/hooks/useVehicles';
+import NavigationHeader from '@/components/NavigationHeader';
+import SidebarMenu from '@/components/SidebarMenu';
 
 export default function VehiclesScreen() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>('available');
@@ -77,14 +82,45 @@ export default function VehiclesScreen() {
     );
   }
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredVehicles = vehicles.filter((vehicle) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      vehicle.vehicle_name.toLowerCase().includes(query) ||
+      vehicle.plate_number.toLowerCase().includes(query) ||
+      vehicle.type.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Available Vehicles</Text>
+      <NavigationHeader
+        title="Vehicles"
+        onMenuPress={() => {}}
+        showNotification={true}
+        showMenu={false}
+        showBack={true}
+      />
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search-outline" size={20} color="#6b7280" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search vehicles..."
+            placeholderTextColor="#9ca3af"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Filters */}
@@ -129,12 +165,12 @@ export default function VehiclesScreen() {
 
       {/* Vehicle List */}
       <FlatList
-        data={vehicles}
+        data={filteredVehicles}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <VehicleListItem vehicle={item} statusColor={getStatusColor(item.status)} statusLabel={getStatusLabel(item.status)} />
         )}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: Platform.OS === 'ios' ? 100 : 80 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7a0019" />
         }
@@ -292,6 +328,35 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingTop: 8,
+  },
+  searchContainer: {
+    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
   },
   vehicleItem: {
     backgroundColor: '#fff',

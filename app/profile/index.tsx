@@ -7,15 +7,21 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Platform,
+  Image,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { formatDate } from '@/lib/utils';
+import NavigationHeader from '@/components/NavigationHeader';
+import SidebarMenu from '@/components/SidebarMenu';
+import CustomTabBar from '@/components/CustomTabBar';
 
 export default function ProfileScreen() {
   const { profile, loading, refreshProfile, signOut } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -59,28 +65,36 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor="#7a0019"
-        />
-      }
-    >
-      {/* Header */}
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <NavigationHeader
+        title="Profile"
+        onMenuPress={() => setSidebarVisible(true)}
+        showNotification={true}
+        showMenu={true}
+      />
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#7a0019"
+          />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
         <View style={styles.avatarContainer}>
           {profile.profile_picture ? (
+            <Image
+              source={{ uri: profile.profile_picture }}
+              style={styles.avatarImage}
+            />
+          ) : (
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
                 {profile.name.charAt(0).toUpperCase()}
               </Text>
-            </View>
-          ) : (
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color="#fff" />
             </View>
           )}
         </View>
@@ -192,7 +206,7 @@ export default function ProfileScreen() {
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => router.push('/(tabs)/profile/settings')}
+          onPress={() => router.push('/profile/settings')}
         >
           <Ionicons name="settings-outline" size={20} color="#7a0019" />
           <Text style={styles.actionButtonText}>Settings</Text>
@@ -202,7 +216,13 @@ export default function ProfileScreen() {
           <Text style={styles.actionButtonTextDanger}>Sign Out</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+      
+      {/* Bottom padding to account for navbar */}
+      <View style={{ height: Platform.OS === 'ios' ? 100 : 80 }} />
+      </ScrollView>
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
+      <CustomTabBar />
+    </View>
   );
 }
 
@@ -210,6 +230,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
+  },
+  scrollView: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,
@@ -250,12 +273,13 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     padding: 24,
+    paddingTop: 24,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
   avatarContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   avatar: {
     width: 80,
@@ -264,6 +288,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#7a0019',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#e5e7eb',
   },
   avatarText: {
     fontSize: 32,

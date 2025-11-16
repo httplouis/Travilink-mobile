@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -19,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatTimeAgo } from '@/lib/utils';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import NavigationHeader from '@/components/NavigationHeader';
+import SidebarMenu from '@/components/SidebarMenu';
 
 type NotificationsTab = 'unread' | 'all';
 
@@ -30,6 +33,7 @@ export default function NotificationsScreen() {
     profile?.id || ''
   );
   const [refreshing, setRefreshing] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
 
@@ -124,18 +128,12 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        {unreadNotifications.length > 0 && (
-          <TouchableOpacity
-            style={styles.markAllButton}
-            onPress={handleMarkAllRead}
-          >
-            <Text style={styles.markAllButtonText}>Mark all read</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <NavigationHeader
+        title="Notifications"
+        onMenuPress={() => setSidebarVisible(true)}
+        showNotification={false}
+        showMenu={true}
+      />
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -212,7 +210,7 @@ export default function NotificationsScreen() {
               </View>
             </TouchableOpacity>
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: Platform.OS === 'ios' ? 140 : 120 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -220,8 +218,34 @@ export default function NotificationsScreen() {
               tintColor="#7a0019"
             />
           }
+          ListFooterComponent={
+            tab === 'unread' && unreadNotifications.length > 0 ? (
+              <View style={styles.markAllFooterContainer}>
+                <TouchableOpacity
+                  style={styles.markAllFooterButton}
+                  onPress={handleMarkAllRead}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="checkmark-done" size={20} color="#7a0019" />
+                  <Text style={styles.markAllFooterButtonText}>Mark all as read</Text>
+                </TouchableOpacity>
+              </View>
+            ) : tab === 'all' && unreadNotifications.length > 0 ? (
+              <View style={styles.markAllFooterContainer}>
+                <TouchableOpacity
+                  style={styles.markAllFooterButton}
+                  onPress={handleMarkAllRead}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="checkmark-done" size={20} color="#7a0019" />
+                  <Text style={styles.markAllFooterButtonText}>Mark all as read</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null
+          }
         />
       )}
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
     </View>
   );
 }
@@ -231,26 +255,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  markAllFooterContainer: {
     padding: 16,
+    paddingTop: 8,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
+  markAllFooterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fef2f2',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
-  markAllButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  markAllButtonText: {
-    fontSize: 14,
+  markAllFooterButtonText: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#7a0019',
   },

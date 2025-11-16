@@ -9,14 +9,16 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { Calendar } from 'react-native-calendars';
+import { Calendar, DateData } from 'react-native-calendars';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCalendar } from '@/hooks/useCalendar';
 import { Booking } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDate } from '@/lib/utils';
+import NavigationHeader from '@/components/NavigationHeader';
+import SidebarMenu from '@/components/SidebarMenu';
 
-type CalendarView = 'week' | 'month' | '2month' | 'year';
+type CalendarView = 'month' | 'year';
 
 export default function CalendarScreen() {
   const { profile, loading: authLoading } = useAuth();
@@ -24,55 +26,45 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [showBookingsModal, setShowBookingsModal] = useState(false);
-  const [selectedBookings, setSelectedBookings] = useState<Booking[]>([]);
+  const [showCapacityModal, setShowCapacityModal] = useState(false);
+  const [selectedDateCount, setSelectedDateCount] = useState(0);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   // Calculate date range based on view
-  const now = new Date();
   const getDateRange = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     switch (view) {
-      case 'week':
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
-        return { start: weekStart, end: weekEnd };
       case 'month':
-        return {
-          start: new Date(now.getFullYear(), now.getMonth(), 1),
-          end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
-        };
-      case '2month':
-        return {
-          start: new Date(now.getFullYear(), now.getMonth(), 1),
-          end: new Date(now.getFullYear(), now.getMonth() + 2, 0),
-        };
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        monthEnd.setHours(23, 59, 59, 999);
+        return { start: monthStart, end: monthEnd };
       case 'year':
-        return {
-          start: new Date(now.getFullYear(), 0, 1),
-          end: new Date(now.getFullYear(), 11, 31),
-        };
+        const yearStart = new Date(today.getFullYear(), 0, 1);
+        const yearEnd = new Date(today.getFullYear(), 11, 31);
+        yearEnd.setHours(23, 59, 59, 999);
+        return { start: yearStart, end: yearEnd };
       default:
-        return {
-          start: new Date(now.getFullYear(), now.getMonth(), 1),
-          end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
-        };
+        const defaultStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const defaultEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        defaultEnd.setHours(23, 59, 59, 999);
+        return { start: defaultStart, end: defaultEnd };
     }
   };
 
   const { start: startDate, end: endDate } = getDateRange();
   const { data: bookings = [], isLoading, refetch } = useCalendar(
-    profile?.id || '',
+    profile?.id || '', // Still pass userId but don't filter by it in hook
     startDate,
     endDate
   );
 
   // Refetch when view changes
   useEffect(() => {
-    if (profile?.id) {
-      refetch();
-    }
-  }, [view, profile?.id, refetch]);
+    refetch();
+  }, [view, refetch]);
 
   // Don't render if still loading auth or no profile
   if (authLoading || !profile) {
@@ -84,77 +76,98 @@ export default function CalendarScreen() {
     );
   }
 
-  // Group bookings by date
+  // Group bookings by date (handle date range for multi-day trips)
   const bookingsByDate: Record<string, Booking[]> = {};
   bookings.forEach((booking) => {
-    if (!bookingsByDate[booking.dateISO]) {
-      bookingsByDate[booking.dateISO] = [];
+    const startDate = new Date(booking.dateISO + 'T00:00:00');
+    const endDateISO = (booking as any).endDateISO || booking.dateISO;
+    const endDate = new Date(endDateISO + 'T23:59:59');
+    
+    // Mark all dates in the range
+    let currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      const dateKey = currentDate.toISOString().split('T')[0];
+      
+      if (!bookingsByDate[dateKey]) {
+        bookingsByDate[dateKey] = [];
+      }
+      bookingsByDate[dateKey].push(booking);
+      
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
     }
-    bookingsByDate[booking.dateISO].push(booking);
   });
 
-  // Create marked dates for calendar
+  // Create marked dates for calendar with capacity display (1/5, 3/5, 5/5)
   const markedDates: Record<string, any> = {};
   Object.keys(bookingsByDate).forEach((date) => {
     const count = bookingsByDate[date].length;
-    let status: 'available' | 'partial' | 'full' = 'available';
-    if (count >= 5) status = 'full';
-    else if (count > 0) status = 'partial';
-
+    const capacity = Math.min(count, 5);
+    const capacityText = `${capacity}/5`;
+    
     markedDates[date] = {
       marked: true,
       dotColor:
-        status === 'full'
+        count >= 5
           ? '#dc2626'
-          : status === 'partial'
+          : count > 0
           ? '#f59e0b'
           : '#16a34a',
       customStyles: {
         container: {
           backgroundColor:
-            status === 'full'
+            count >= 5
               ? '#fee2e2'
-              : status === 'partial'
+              : count > 0
               ? '#fef3c7'
               : '#d1fae5',
+          borderRadius: 8,
+          padding: 4,
         },
         text: {
           color:
-            status === 'full'
+            count >= 5
               ? '#991b1b'
-              : status === 'partial'
+              : count > 0
               ? '#92400e'
               : '#166534',
-          fontWeight: '600',
+          fontWeight: '700',
+          fontSize: 12,
         },
       },
+      // Add custom text overlay for capacity
+      selected: false,
     };
   });
 
-  const handleDatePress = (day: DateObject) => {
-    const dateBookings = bookingsByDate[day.dateString] || [];
+  const handleDatePress = (day: DateData) => {
+    const count = bookingsByDate[day.dateString]?.length || 0;
     setSelectedDate(day.dateString);
-    setSelectedBookings(dateBookings);
-    setShowBookingsModal(true);
+    setSelectedDateCount(count);
+    setShowCapacityModal(true);
   };
 
-  const getStatusColor = (count: number) => {
+  const getCapacityColor = (count: number) => {
     if (count >= 5) return '#dc2626';
     if (count > 0) return '#f59e0b';
     return '#16a34a';
   };
 
-  const getStatusLabel = (count: number) => {
-    if (count >= 5) return 'Full';
-    if (count > 0) return `${5 - count} left`;
-    return 'Available';
+  const getCapacityLabel = (count: number) => {
+    if (count >= 5) return '5/5 - Full';
+    if (count > 0) return `${count}/5 - ${5 - count} slots available`;
+    return '0/5 - Available';
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Schedule</Text>
+      <NavigationHeader
+        title="Schedule"
+        onMenuPress={() => setSidebarVisible(true)}
+        showNotification={true}
+        showMenu={true}
+      />
+      <View style={styles.subHeader}>
         <Text style={styles.headerSubtitle}>
           Click a date to view reservations
         </Text>
@@ -162,7 +175,7 @@ export default function CalendarScreen() {
 
       {/* View Selector */}
       <View style={styles.viewSelector}>
-        {(['week', 'month', '2month', 'year'] as CalendarView[]).map((v) => (
+        {(['month', 'year'] as CalendarView[]).map((v) => (
           <TouchableOpacity
             key={v}
             style={[styles.viewButton, view === v && styles.viewButtonActive]}
@@ -174,7 +187,7 @@ export default function CalendarScreen() {
                 view === v && styles.viewButtonTextActive,
               ]}
             >
-              {v === '2month' ? '2-Month' : v.charAt(0).toUpperCase() + v.slice(1)}
+              {v.charAt(0).toUpperCase() + v.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -187,68 +200,188 @@ export default function CalendarScreen() {
         </View>
       ) : (
         <ScrollView style={styles.scrollView}>
-          <View style={styles.calendarContainer}>
-            <Calendar
-              current={selectedDate}
-              onDayPress={handleDatePress}
-              markedDates={markedDates}
-              markingType="custom"
-              enableSwipeMonths={true}
-              hideExtraDays={true}
-              disableMonthChange={false}
-              firstDay={0}
-              showWeekNumbers={false}
-              onMonthChange={(month) => {
-                // Handle month change if needed
-              }}
-              theme={{
-                backgroundColor: '#fff',
-                calendarBackground: '#fff',
-                textSectionTitleColor: '#6b7280',
-                selectedDayBackgroundColor: '#7a0019',
-                selectedDayTextColor: '#fff',
-                todayTextColor: '#7a0019',
-                dayTextColor: '#111827',
-                textDisabledColor: '#d1d5db',
-                dotColor: '#7a0019',
-                selectedDotColor: '#fff',
-                arrowColor: '#7a0019',
-                monthTextColor: '#111827',
-                textDayFontWeight: '600',
-                textMonthFontWeight: '700',
-                textDayHeaderFontWeight: '600',
-                textDayFontSize: 14,
-                textMonthFontSize: 18,
-                textDayHeaderFontSize: 12,
-              }}
-              style={styles.calendar}
-            />
-          </View>
-
-          {/* Legend */}
-          <View style={styles.legend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#16a34a' }]} />
-              <Text style={styles.legendText}>Available</Text>
+          {view === 'year' ? (
+            // Year View - Calendar Grid (3 columns, 4 rows like screenshot)
+            <View style={styles.yearViewContainer}>
+              <Text style={styles.yearTitle}>{new Date().getFullYear()}</Text>
+              <View style={styles.yearGrid}>
+                {Array.from({ length: 12 }, (_, i) => {
+                  const currentYear = new Date().getFullYear();
+                  const monthDate = new Date(currentYear, i, 1);
+                  const monthName = monthDate.toLocaleDateString('en-US', { month: 'short' });
+                  const fullMonthName = monthDate.toLocaleDateString('en-US', { month: 'long' });
+                  // Create date string for the first day of the month
+                  const yearMonth = `${currentYear}-${String(i + 1).padStart(2, '0')}-01`;
+                  // Count bookings for this month
+                  const monthBookings = bookings.filter((booking) => {
+                    const bookingDate = new Date(booking.dateISO);
+                    return bookingDate.getMonth() === i && bookingDate.getFullYear() === currentYear;
+                  });
+                  const monthCount = monthBookings.length;
+                  const isCurrentMonth = new Date().getMonth() === i;
+                  
+                  // Get first day of month and number of days
+                  const firstDay = new Date(currentYear, i, 1).getDay();
+                  const daysInMonth = new Date(currentYear, i + 1, 0).getDate();
+                  
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[
+                        styles.yearMonthGridItem,
+                        isCurrentMonth && styles.yearMonthGridItemCurrent,
+                      ]}
+                      onPress={() => {
+                        setView('month');
+                        setSelectedDate(yearMonth);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      {/* Badge at top-right */}
+                      {monthCount > 0 && (
+                        <View style={styles.yearMonthGridBadge}>
+                          <Text style={styles.yearMonthGridBadgeText}>{monthCount}</Text>
+                        </View>
+                      )}
+                      <Text style={[
+                        styles.yearMonthGridName,
+                        isCurrentMonth && styles.yearMonthGridNameCurrent,
+                      ]}>
+                        {monthName}
+                      </Text>
+                      <View style={styles.yearMonthGridCalendar}>
+                        {/* Day headers */}
+                        <View style={styles.yearMonthGridDaysHeader}>
+                          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                            <Text key={idx} style={styles.yearMonthGridDayHeader}>{day}</Text>
+                          ))}
+                        </View>
+                        {/* Calendar grid */}
+                        <View style={styles.yearMonthGridDays}>
+                          {/* Empty cells for days before month starts */}
+                          {Array.from({ length: firstDay }, (_, idx) => (
+                            <View key={`empty-${idx}`} style={styles.yearMonthGridDayEmpty} />
+                          ))}
+                          {/* Days of the month - show first 3 weeks (21 days) */}
+                          {Array.from({ length: Math.min(daysInMonth, 21) }, (_, idx) => {
+                            const day = idx + 1;
+                            const dayDate = `${currentYear}-${String(i + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                            const hasBooking = bookings.some((b) => {
+                              const bDate = new Date(b.dateISO).toISOString().split('T')[0];
+                              return bDate === dayDate;
+                            });
+                            const isToday = new Date().toDateString() === new Date(currentYear, i, day).toDateString();
+                            
+                            return (
+                              <View
+                                key={day}
+                                style={[
+                                  styles.yearMonthGridDay,
+                                  hasBooking && styles.yearMonthGridDayBooked,
+                                  isToday && styles.yearMonthGridDayToday,
+                                ]}
+                              >
+                                <Text style={[
+                                  styles.yearMonthGridDayText,
+                                  hasBooking && styles.yearMonthGridDayTextBooked,
+                                  isToday && styles.yearMonthGridDayTextToday,
+                                ]}>
+                                  {day}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                          {/* Fill remaining cells to complete 3 rows (21 cells total) */}
+                          {Array.from({ length: Math.max(0, 21 - firstDay - Math.min(daysInMonth, 21)) }, (_, idx) => (
+                            <View key={`fill-${idx}`} style={styles.yearMonthGridDayEmpty} />
+                          ))}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              
+              {/* Legend - positioned below last 3 months (October, November, December) */}
+              <View style={styles.legend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#16a34a' }]} />
+                  <Text style={styles.legendText}>0/5 Available</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
+                  <Text style={styles.legendText}>1-4/5 Partial</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#dc2626' }]} />
+                  <Text style={styles.legendText}>5/5 Full</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.legendText}>Partial</Text>
+          ) : (
+            // Month View - Default
+            <View style={styles.calendarContainer}>
+              <Calendar
+                current={selectedDate}
+                onDayPress={handleDatePress}
+                markedDates={markedDates}
+                markingType="custom"
+                enableSwipeMonths={true}
+                hideExtraDays={true}
+                firstDay={0}
+                showWeekNumbers={false}
+                theme={{
+                  backgroundColor: '#fff',
+                  calendarBackground: '#fff',
+                  textSectionTitleColor: '#6b7280',
+                  selectedDayBackgroundColor: '#7a0019',
+                  selectedDayTextColor: '#fff',
+                  todayTextColor: '#7a0019',
+                  dayTextColor: '#111827',
+                  textDisabledColor: '#d1d5db',
+                  dotColor: '#7a0019',
+                  selectedDotColor: '#fff',
+                  arrowColor: '#7a0019',
+                  monthTextColor: '#111827',
+                  textDayFontWeight: '600',
+                  textMonthFontWeight: '700',
+                  textDayHeaderFontWeight: '600',
+                  textDayFontSize: 14,
+                  textMonthFontSize: 18,
+                  textDayHeaderFontSize: 12,
+                }}
+                style={styles.calendar}
+              />
+              
+              {/* Legend for month view */}
+              <View style={styles.legend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#16a34a' }]} />
+                  <Text style={styles.legendText}>0/5 Available</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
+                  <Text style={styles.legendText}>1-4/5 Partial</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#dc2626' }]} />
+                  <Text style={styles.legendText}>5/5 Full</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#dc2626' }]} />
-              <Text style={styles.legendText}>Full</Text>
-            </View>
-          </View>
+          )}
+          
+          {/* Bottom padding to account for navbar */}
+          <View style={{ height: Platform.OS === 'ios' ? 100 : 80 }} />
         </ScrollView>
       )}
 
-      {/* Bookings Modal */}
+      {/* Capacity Modal */}
       <Modal
-        visible={showBookingsModal}
+        visible={showCapacityModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowBookingsModal(false)}
+        onRequestClose={() => setShowCapacityModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
@@ -257,7 +390,7 @@ export default function CalendarScreen() {
                 {formatDate(selectedDate)}
               </Text>
               <TouchableOpacity
-                onPress={() => setShowBookingsModal(false)}
+                onPress={() => setShowCapacityModal(false)}
                 style={styles.closeButton}
               >
                 <Ionicons name="close" size={24} color="#111827" />
@@ -265,76 +398,53 @@ export default function CalendarScreen() {
             </View>
 
             <View style={styles.modalContent}>
-              {selectedBookings.length === 0 ? (
-                <View style={styles.emptyBookings}>
-                  <Ionicons name="calendar-outline" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyBookingsText}>
-                    No reservations for this date
-                  </Text>
+              <View style={styles.capacityCard}>
+                <View style={[styles.capacityIconContainer, { backgroundColor: getCapacityColor(selectedDateCount) + '20' }]}>
+                  <Ionicons 
+                    name={selectedDateCount >= 5 ? "close-circle" : selectedDateCount > 0 ? "time" : "checkmark-circle"} 
+                    size={48} 
+                    color={getCapacityColor(selectedDateCount)} 
+                  />
                 </View>
-              ) : (
-                <View style={styles.bookingsList}>
-                  {selectedBookings.map((booking) => (
-                    <View key={booking.id} style={styles.bookingCard}>
-                      <View style={styles.bookingHeader}>
-                        <Text style={styles.bookingPurpose}>
-                          {booking.purpose}
-                        </Text>
-                        <View
-                          style={[
-                            styles.bookingStatus,
-                            {
-                              backgroundColor: getStatusColor(1) + '20',
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.bookingStatusText,
-                              { color: getStatusColor(1) },
-                            ]}
-                          >
-                            {getStatusLabel(1)}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.bookingDepartment}>
-                        {booking.department}
-                      </Text>
-                      <View style={styles.bookingDetails}>
-                        <View style={styles.bookingDetail}>
-                          <Ionicons name="location-outline" size={16} color="#6b7280" />
-                          <Text style={styles.bookingDetailText}>
-                            {booking.destination}
-                          </Text>
-                        </View>
-                        <View style={styles.bookingDetail}>
-                          <Ionicons name="car-outline" size={16} color="#6b7280" />
-                          <Text style={styles.bookingDetailText}>
-                            {booking.vehicle} - {booking.vehicleName}
-                          </Text>
-                        </View>
-                        <View style={styles.bookingDetail}>
-                          <Ionicons name="person-outline" size={16} color="#6b7280" />
-                          <Text style={styles.bookingDetailText}>
-                            {booking.driver}
-                          </Text>
-                        </View>
-                        <View style={styles.bookingDetail}>
-                          <Ionicons name="time-outline" size={16} color="#6b7280" />
-                          <Text style={styles.bookingDetailText}>
-                            {booking.departAt} → {booking.returnAt}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
+                <Text style={styles.capacityValue}>
+                  {selectedDateCount}/5
+                </Text>
+                <Text style={styles.capacityLabel}>
+                  {getCapacityLabel(selectedDateCount)}
+                </Text>
+                
+                {selectedDateCount >= 5 && (
+                  <View style={styles.fullWarning}>
+                    <Ionicons name="alert-circle" size={20} color="#dc2626" />
+                    <Text style={styles.fullWarningText}>
+                      All slots are booked for this date
+                    </Text>
+                  </View>
+                )}
+                
+                {selectedDateCount > 0 && selectedDateCount < 5 && (
+                  <View style={styles.partialInfo}>
+                    <Ionicons name="information-circle" size={20} color="#f59e0b" />
+                    <Text style={styles.partialInfoText}>
+                      {5 - selectedDateCount} slot{5 - selectedDateCount !== 1 ? 's' : ''} still available
+                    </Text>
+                  </View>
+                )}
+                
+                {selectedDateCount === 0 && (
+                  <View style={styles.availableInfo}>
+                    <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
+                    <Text style={styles.availableInfoText}>
+                      All 5 slots are available for booking
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </View>
       </Modal>
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
     </View>
   );
 }
@@ -344,17 +454,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  header: {
+  subHeader: {
     padding: 16,
+    paddingTop: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
@@ -413,8 +518,11 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 16,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   legendItem: {
     flexDirection: 'row',
@@ -439,6 +547,122 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#6b7280',
+  },
+  yearViewContainer: {
+    padding: 16,
+    paddingBottom: 120,
+  },
+  yearTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  yearGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  yearMonthGridItem: {
+    width: '31%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    minHeight: 130,
+    position: 'relative',
+  },
+  yearMonthGridItemCurrent: {
+    borderColor: '#7a0019',
+    borderWidth: 2,
+    backgroundColor: '#fef2f2',
+  },
+  yearMonthGridName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  yearMonthGridNameCurrent: {
+    color: '#7a0019',
+    fontWeight: '700',
+  },
+  yearMonthGridCalendar: {
+    position: 'relative',
+  },
+  yearMonthGridDaysHeader: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  yearMonthGridDayHeader: {
+    flex: 1,
+    fontSize: 8,
+    fontWeight: '600',
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  yearMonthGridDays: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+  },
+  yearMonthGridDayEmpty: {
+    width: '14.28%',
+    aspectRatio: 1,
+  },
+  yearMonthGridDay: {
+    width: '14.28%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 4,
+  },
+  yearMonthGridDayBooked: {
+    backgroundColor: '#fef3c7',
+  },
+  yearMonthGridDayToday: {
+    backgroundColor: '#7a0019',
+  },
+  yearMonthGridDayText: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  yearMonthGridDayTextBooked: {
+    color: '#92400e',
+    fontWeight: '600',
+  },
+  yearMonthGridDayTextToday: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  yearMonthGridBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#7a0019',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    zIndex: 10,
+  },
+  yearMonthGridBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   modalOverlay: {
     position: 'absolute',
@@ -474,66 +698,78 @@ const styles = StyleSheet.create({
   modalContent: {
     maxHeight: 500,
   },
-  emptyBookings: {
-    padding: 48,
+  capacityCard: {
+    padding: 32,
     alignItems: 'center',
   },
-  emptyBookingsText: {
-    marginTop: 16,
-    fontSize: 14,
-    color: '#6b7280',
+  capacityIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  bookingsList: {
-    padding: 16,
-    gap: 12,
-  },
-  bookingCard: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  bookingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  bookingPurpose: {
-    fontSize: 16,
+  capacityValue: {
+    fontSize: 48,
     fontWeight: '700',
     color: '#111827',
-    flex: 1,
+    marginBottom: 8,
   },
-  bookingStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  bookingStatusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  bookingDepartment: {
-    fontSize: 11,
+  capacityLabel: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
+    marginBottom: 24,
+    textAlign: 'center',
   },
-  bookingDetails: {
-    gap: 8,
-  },
-  bookingDetail: {
+  fullWarning: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: '#fee2e2',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
-  bookingDetailText: {
+  fullWarningText: {
     fontSize: 14,
-    color: '#374151',
+    fontWeight: '600',
+    color: '#991b1b',
+    flex: 1,
+  },
+  partialInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  partialInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400e',
+    flex: 1,
+  },
+  availableInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f0fdf4',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  availableInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#166534',
+    flex: 1,
   },
 });
 

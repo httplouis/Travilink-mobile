@@ -62,6 +62,13 @@ npm install
 - `react-native-gesture-handler` - Gesture handling
 - `react-native-safe-area-context` - Safe area handling
 - `@expo/vector-icons` - Icon library
+- `expo-location` - Location services (for map picker and current location)
+- `react-native-maps` - Map component for location selection
+- `expo-document-picker` - File picker for signature upload
+- `expo-file-system` - File system access for reading signature images
+- `@react-native-community/datetimepicker` - Native date/time picker
+- `react-native-signature-canvas` - Signature pad component
+- `react-native-webview` - WebView for signature canvas
 
 ### 3. Configure Environment Variables
 
@@ -201,10 +208,17 @@ The app connects directly to Supabase (same database as web app):
 - Real-time subscriptions for live updates
 - No separate API server needed
 
+**External APIs:**
+- **Nominatim (OpenStreetMap)** - Free location search and geocoding (no API key required)
+  - Used for map picker search/autocomplete
+  - Reverse geocoding to get addresses from coordinates
+  - No rate limits for reasonable usage
+  - User-Agent header set to "TraviLink-Mobile/1.0" (required by Nominatim)
+
 **Tables used:**
 - `requests` - Transportation requests
 - `notifications` - User notifications
-- `users` - User profiles
+- `users` - User profiles (with position_title, department, role)
 - `departments` - Department information
 - `vehicles` - Vehicle information
 - `request_history` - Approval timeline
@@ -357,9 +371,19 @@ Required environment variables (in `.env` file):
 - Phase 5: Calendar (Month view + Bookings)
 - Phase 6: Notifications (List + Real-time)
 
+### ✅ Recently Completed
+- Phase 7: Request Submission (Travel Order and Seminar forms)
+  - Complete form implementation matching web version exactly
+  - All data fields and validation logic
+  - Map picker with search/autocomplete (using Nominatim/OpenStreetMap - free, no API key needed)
+  - User searchable select with full user list
+  - Department selection
+  - Costs section with dynamic expenses
+  - Signature pad with drawing and image upload
+  - Full database integration with Supabase
+
 ### ⏳ In Progress
-- Phase 7: Request Submission (Form wizard)
-- Phase 8: Polish (Error handling, optimizations)
+- Phase 8: Polish (Error handling, optimizations, mobile UX improvements)
 
 ---
 

@@ -1,9 +1,11 @@
 import { Tabs, Redirect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { ActivityIndicator, View, TouchableOpacity, Platform } from 'react-native';
+import { ActivityIndicator, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import SidebarMenu from '@/components/SidebarMenu';
+import CustomTabBar from '@/components/CustomTabBar';
+import React from 'react';
 
 export default function TabsLayout() {
   const { session, loading } = useAuth();
@@ -21,105 +23,70 @@ export default function TabsLayout() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
+  // Icon components - Teams-inspired design
+  const HomeIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+    <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+  );
+
+  const RequestIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+    <Ionicons name={focused ? "add-circle" : "add-circle-outline"} size={24} color={color} />
+  );
+
+  const CalendarIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+    <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
+  );
+
+  const SubmissionsIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+    <Ionicons name={focused ? "list" : "list-outline"} size={24} color={color} />
+  );
+
+  const MoreIcon = ({ color, focused }: { color: string; focused: boolean }) => (
+    <Ionicons name={focused ? "ellipsis-horizontal" : "ellipsis-horizontal-outline"} size={24} color={color} />
+  );
+
   return (
     <>
       <Tabs
+        tabBar={(props) => <CustomTabBar />}
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: '#7a0019',
-          tabBarInactiveTintColor: '#9ca3af',
-          tabBarStyle: {
-            borderTopWidth: 1,
-            borderTopColor: '#e5e7eb',
-            paddingTop: 8,
-            paddingBottom: 8,
-            height: Platform.OS === 'ios' ? 85 : 65,
-            backgroundColor: '#fff',
-            elevation: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-          },
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '600',
-            marginTop: 4,
-          },
+          tabBarStyle: { display: 'none' }, // Hide default tab bar
         }}
       >
+        {/* ONLY 5 TABS - EXPLICITLY DEFINED */}
         <Tabs.Screen
           name="dashboard"
           options={{
             title: 'Home',
-            tabBarIcon: ({ color, size, focused }) => (
-              <Ionicons 
-                name={focused ? "home" : "home-outline"} 
-                size={size} 
-                color={color} 
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="request"
-          options={{
-            title: '',
-            tabBarIcon: ({ focused }) => (
-              <View
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 28,
-                  backgroundColor: '#7a0019',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginBottom: 20,
-                  shadowColor: '#7a0019',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 8,
-                }}
-              >
-                <Ionicons name="add" size={32} color="#fff" />
-              </View>
-            ),
-            tabBarButton: (props) => (
-              <TouchableOpacity {...props} activeOpacity={0.7} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: ({ color, size, focused }) => (
-              <Ionicons 
-                name={focused ? "person" : "person-outline"} 
-                size={size} 
-                color={color} 
-              />
-            ),
-          }}
-        />
-        {/* Hidden screens - accessible via sidebar */}
-        <Tabs.Screen
-          name="submissions"
-          options={{
-            tabBarButton: () => null, // Completely hide from tab bar
+            tabBarIcon: ({ color, focused }) => <HomeIcon color={color} focused={focused} />,
           }}
         />
         <Tabs.Screen
           name="calendar"
           options={{
-            tabBarButton: () => null, // Completely hide from tab bar
+            title: 'Calendar',
+            tabBarIcon: ({ color, focused }) => <CalendarIcon color={color} focused={focused} />,
           }}
         />
         <Tabs.Screen
-          name="notifications"
+          name="request"
           options={{
-            tabBarButton: () => null, // Completely hide from tab bar
+            title: 'Request',
+            tabBarIcon: ({ color, focused }) => <RequestIcon color={color} focused={focused} />,
+          }}
+        />
+        <Tabs.Screen
+          name="submissions"
+          options={{
+            title: 'Requests',
+            tabBarIcon: ({ color, focused }) => <SubmissionsIcon color={color} focused={focused} />,
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: 'More',
+            tabBarIcon: ({ color, focused }) => <MoreIcon color={color} focused={focused} />,
           }}
         />
       </Tabs>
@@ -127,4 +94,3 @@ export default function TabsLayout() {
     </>
   );
 }
-

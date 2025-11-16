@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
@@ -20,6 +22,7 @@ import { useRequestTracking } from '@/hooks/useRequestTracking';
 
 export default function RequestDetailsScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'tracking'>(tab === 'tracking' ? 'tracking' : 'details');
 
@@ -80,10 +83,11 @@ export default function RequestDetailsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+          activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
@@ -169,15 +173,19 @@ export default function RequestDetailsScreen() {
               <Text style={styles.sectionTitle}>Travel Details</Text>
               <View style={styles.detailGrid}>
                 <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Requester</Text>
+                  <Text style={styles.detailValue}>{request.requester_name || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Destination</Text>
                   <Text style={styles.detailValue}>{request.destination}</Text>
                 </View>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>Department</Text>
-                      <Text style={styles.detailValue}>
-                        {trackingData?.department?.name || 'N/A'}
-                      </Text>
-                    </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Department</Text>
+                  <Text style={styles.detailValue}>
+                    {trackingData?.department?.name || 'N/A'}
+                  </Text>
+                </View>
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Travel Dates</Text>
                   <Text style={styles.detailValue}>

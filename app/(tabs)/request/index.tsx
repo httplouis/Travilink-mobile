@@ -1,11 +1,21 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import NavigationHeader from '@/components/NavigationHeader';
+import SidebarMenu from '@/components/SidebarMenu';
 
 export default function RequestScreen() {
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+
   return (
     <View style={styles.container}>
+      <NavigationHeader
+        title="Create Request"
+        onMenuPress={() => setSidebarVisible(true)}
+        showNotification={true}
+        showMenu={true}
+      />
       <View style={styles.content}>
         <Ionicons name="add-circle-outline" size={64} color="#7a0019" />
         <Text style={styles.title}>Create New Request</Text>
@@ -39,6 +49,7 @@ export default function RequestScreen() {
           </TouchableOpacity>
         </View>
       </View>
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
     </View>
   );
 }

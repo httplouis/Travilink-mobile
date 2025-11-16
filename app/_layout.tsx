@@ -30,7 +30,17 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="request/[id]" />
+              <Stack.Screen name="request/new" />
+              <Stack.Screen name="request/travel-order" />
+              <Stack.Screen name="request/seminar" />
               <Stack.Screen name="auth/callback" />
+              <Stack.Screen name="notifications" />
+              <Stack.Screen name="feedback" />
+              <Stack.Screen name="profile" />
+              <Stack.Screen name="profile/settings" />
+              <Stack.Screen name="vehicles" />
+              <Stack.Screen name="drivers" />
+              <Stack.Screen name="help" />
             </Stack>
           </AuthProvider>
         </QueryClientProvider>

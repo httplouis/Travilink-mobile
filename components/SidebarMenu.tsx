@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,16 @@ import {
   Modal,
   Animated,
   Dimensions,
+  Image,
+  Switch,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase/client';
+import { AvailabilityStatus } from '@/lib/types';
+import AvailabilityPicker from '@/components/AvailabilityPicker';
 
 interface SidebarMenuProps {
   visible: boolean;
@@ -18,25 +24,37 @@ interface SidebarMenuProps {
 }
 
 export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const slideAnim = React.useRef(new Animated.Value(-Dimensions.get('window').width)).current;
+  const [shouldRender, setShouldRender] = React.useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [updatingAvailability, setUpdatingAvailability] = useState(false);
 
   React.useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
+      setShouldRender(true);
+      slideAnim.setValue(-Dimensions.get('window').width);
+      const timer = setTimeout(() => {
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+          velocity: 0,
+        }).start();
+      }, 10);
+      return () => clearTimeout(timer);
     } else {
       Animated.timing(slideAnim, {
         toValue: -Dimensions.get('window').width,
-        duration: 250,
+        duration: 200,
         useNativeDriver: true,
-      }).start();
+        easing: (t) => t * (2 - t),
+      }).start(() => {
+        setShouldRender(false);
+      });
     }
-  }, [visible]);
+  }, [visible, slideAnim]);
 
   const handleNavigate = (path: string) => {
     onClose();
@@ -45,31 +63,43 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
     }, 250);
   };
 
+  const handleAvailabilityChange = async (status: AvailabilityStatus) => {
+    if (!profile || updatingAvailability) return;
+    
+    setUpdatingAvailability(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ availability_status: status })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      
+      await refreshProfile();
+    } catch (error) {
+      console.error('[SidebarMenu] Error updating availability:', error);
+    } finally {
+      setUpdatingAvailability(false);
+    }
+  };
+
+
+  // Filter menu items - only items not in bottom nav
   const menuItems = [
-    {
-      icon: 'list-outline' as const,
-      label: 'My Requests',
-      path: '/(tabs)/submissions',
-    },
-    {
-      icon: 'calendar-outline' as const,
-      label: 'Schedule',
-      path: '/(tabs)/calendar',
-    },
-    {
-      icon: 'notifications-outline' as const,
-      label: 'Notifications',
-      path: '/(tabs)/notifications',
-    },
     {
       icon: 'car-outline' as const,
       label: 'Vehicles',
       path: '/vehicles',
     },
     {
+      icon: 'person-outline' as const,
+      label: 'Drivers',
+      path: '/drivers',
+    },
+    {
       icon: 'settings-outline' as const,
       label: 'Settings',
-      path: '/(tabs)/profile/settings',
+      path: '/profile/settings',
     },
     {
       icon: 'help-circle-outline' as const,
@@ -78,19 +108,33 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
     },
   ];
 
+  // Add admin/manager items conditionally
+  const isAdminOrManager =
+    profile &&
+    (profile.role === 'admin' ||
+      profile.is_head ||
+      profile.is_hr ||
+      profile.is_exec ||
+      profile.role === 'driver');
+
+  // Filter menu items based on role
+  const filteredMenuItems = isAdminOrManager
+    ? menuItems
+    : menuItems.filter((item) => item.path !== '/vehicles' && item.path !== '/drivers');
+
+  if (!visible && !shouldRender) {
+    return null;
+  }
+
   return (
     <Modal
-      visible={visible}
+      visible={visible || shouldRender}
       transparent
       animationType="none"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
         <Animated.View
           style={[
             styles.sidebar,
@@ -99,18 +143,25 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
             },
           ]}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.profileSection}>
+          {/* Profile Header - Teams-inspired */}
+          <View style={styles.profileHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                handleNavigate('/profile');
+              }}
+              activeOpacity={0.7}
+              style={styles.profileSection}
+            >
               {profile?.profile_picture ? (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {profile.name?.charAt(0).toUpperCase() || 'U'}
-                  </Text>
-                </View>
+                <Image
+                  source={{ uri: profile.profile_picture }}
+                  style={styles.avatarImage}
+                />
               ) : (
                 <View style={styles.avatar}>
-                  <Ionicons name="person" size={32} color="#fff" />
+                  <Text style={styles.avatarText}>
+                    {profile?.name?.charAt(0).toUpperCase() || 'U'}
+                  </Text>
                 </View>
               )}
               <View style={styles.profileInfo}>
@@ -121,15 +172,41 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
                   {profile?.email || ''}
                 </Text>
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
           </View>
 
+          {/* Availability Status */}
+          <View style={styles.availabilitySection}>
+            <Text style={styles.availabilityLabel}>Set availability</Text>
+            <AvailabilityPicker
+              currentStatus={profile?.availability_status || 'online'}
+              onSelect={handleAvailabilityChange}
+            />
+          </View>
+
+          {/* Notifications Toggle */}
+          <View style={styles.notificationSection}>
+            <View style={styles.notificationRow}>
+              <View style={styles.notificationLeft}>
+                <Ionicons name="notifications-outline" size={20} color="#6b7280" />
+                <Text style={styles.notificationLabel}>Notifications</Text>
+              </View>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={setNotificationsEnabled}
+                trackColor={{ false: '#d1d5db', true: '#7a0019' }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+
           {/* Menu Items */}
           <View style={styles.menu}>
-            {menuItems.map((item, index) => (
+            {filteredMenuItems.map((item) => (
               <TouchableOpacity
                 key={item.path}
                 style={styles.menuItem}
@@ -144,7 +221,33 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.footerButton}
+              onPress={() => handleNavigate('/feedback')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="star-outline" size={18} color="#6b7280" />
+              <Text style={styles.footerButtonText}>Feedback</Text>
+            </TouchableOpacity>
+            <View style={styles.footerDivider} />
+            <TouchableOpacity
+              style={styles.footerButton}
+              onPress={() => handleNavigate('/profile/settings')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
+              <Text style={styles.footerButtonText}>About</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
       </View>
     </Modal>
   );
@@ -160,18 +263,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   sidebar: {
-    width: Dimensions.get('window').width * 0.8,
-    maxWidth: 320,
+    width: Dimensions.get('window').width * 0.85,
+    maxWidth: 340,
     backgroundColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
+    shadowOffset: { width: 2, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
+    justifyContent: 'space-between',
   },
-  header: {
+  profileHeader: {
     padding: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     flexDirection: 'row',
@@ -182,38 +286,80 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 12,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#7a0019',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#e5e7eb',
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
     color: '#fff',
   },
   profileInfo: {
     flex: 1,
+    minWidth: 0,
   },
   profileName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6b7280',
   },
   closeButton: {
     padding: 4,
+    marginLeft: 8,
+  },
+  availabilitySection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  availabilityLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  notificationSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  notificationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  notificationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notificationLabel: {
+    fontSize: 16,
+    color: '#111827',
+    fontWeight: '500',
   },
   menu: {
+    flex: 1,
     paddingVertical: 8,
   },
   menuItem: {
@@ -228,12 +374,38 @@ const styles = StyleSheet.create({
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 16,
     flex: 1,
   },
   menuItemLabel: {
     fontSize: 16,
     color: '#111827',
-    marginLeft: 16,
+    fontWeight: '500',
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+  },
+  footerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  footerButtonText: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  footerDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#e5e7eb',
   },
 });
-

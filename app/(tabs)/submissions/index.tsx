@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,18 +7,26 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequests } from '@/hooks/useRequests';
 import RequestCard from '@/components/RequestCard';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Request } from '@/lib/types';
+import { Request, RequestStatus } from '@/lib/types';
+import NavigationHeader from '@/components/NavigationHeader';
+import SidebarMenu from '@/components/SidebarMenu';
 
 export default function SubmissionsScreen() {
   const { profile, loading: authLoading } = useAuth();
   const { requests, isLoading, error, refetch } = useRequests(profile?.id || '');
   const [refreshing, setRefreshing] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
 
   // Don't render if still loading auth or no profile
   if (authLoading || !profile) {
@@ -48,6 +56,44 @@ export default function SubmissionsScreen() {
     router.push(`/request/${request.id}?tab=tracking`);
   };
 
+  // Filter and search requests
+  const filteredRequests = useMemo(() => {
+    let filtered = requests;
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((req) => req.status === statusFilter);
+    }
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (req) =>
+          req.request_number.toLowerCase().includes(query) ||
+          req.title?.toLowerCase().includes(query) ||
+          req.purpose?.toLowerCase().includes(query) ||
+          req.destination.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [requests, statusFilter, searchQuery]);
+
+  const statusOptions: (RequestStatus | 'all')[] = [
+    'all',
+    'pending_head',
+    'pending_parent_head',
+    'pending_admin',
+    'pending_comptroller',
+    'pending_hr',
+    'pending_vp',
+    'pending_president',
+    'pending_exec',
+    'approved',
+    'rejected',
+  ];
+
   if (isLoading && requests.length === 0) {
     return (
       <View style={styles.centerContainer}>
@@ -70,37 +116,88 @@ export default function SubmissionsScreen() {
     );
   }
 
-  if (requests.length === 0) {
+  if (!isLoading && requests.length === 0) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="document-text-outline" size={64} color="#9ca3af" />
-        <Text style={styles.emptyTitle}>No submissions yet</Text>
-        <Text style={styles.emptyText}>
-          Your submitted requests will appear here
-        </Text>
+      <View style={styles.container}>
+        <NavigationHeader
+          title="My Requests"
+          onMenuPress={() => setSidebarVisible(true)}
+          showNotification={true}
+          showMenu={true}
+        />
+        <View style={styles.centerContainer}>
+          <Ionicons name="document-text-outline" size={64} color="#9ca3af" />
+          <Text style={styles.emptyTitle}>No submissions yet</Text>
+          <Text style={styles.emptyText}>
+            Your submitted requests will appear here
+          </Text>
+        </View>
+        <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>My Requests</Text>
-            <Text style={styles.headerSubtitle}>
-              {requests.length} request{requests.length !== 1 ? 's' : ''}
-            </Text>
-          </View>
-        <View style={styles.autoRefreshIndicator}>
-          <View style={styles.indicatorDot} />
-          <Text style={styles.indicatorText}>Live</Text>
+      <NavigationHeader
+        title="My Requests"
+        onMenuPress={() => setSidebarVisible(true)}
+        showNotification={true}
+        showMenu={true}
+      />
+      <View style={styles.subHeader}>
+        <Text style={styles.subHeaderText}>
+          {filteredRequests.length} of {requests.length} request{requests.length !== 1 ? 's' : ''}
+        </Text>
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search-outline" size={20} color="#6b7280" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search requests..."
+            placeholderTextColor="#9ca3af"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
         </View>
+      </View>
+
+      {/* Status Filter */}
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          {statusOptions.map((status) => (
+            <TouchableOpacity
+              key={status}
+              style={[
+                styles.filterChip,
+                statusFilter === status && styles.filterChipActive,
+              ]}
+              onPress={() => setStatusFilter(status)}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  statusFilter === status && styles.filterChipTextActive,
+                ]}
+              >
+                {status === 'all' ? 'All' : status.replace('pending_', '').replace('_', ' ')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Request List */}
       <FlatList
-        data={requests}
+        data={filteredRequests}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <RequestCard
@@ -110,20 +207,27 @@ export default function SubmissionsScreen() {
             onViewTracking={() => handleViewTracking(item)}
           />
         )}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#7a0019"
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No requests found</Text>
-          </View>
-        }
-      />
+          contentContainerStyle={[styles.listContent, { paddingBottom: Platform.OS === 'ios' ? 100 : 80 }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#7a0019"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.centerContainer}>
+              <Ionicons name="search-outline" size={48} color="#9ca3af" />
+              <Text style={styles.emptyTitle}>No requests found</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery || statusFilter !== 'all'
+                  ? 'Try adjusting your search or filter'
+                  : 'No requests match your criteria'}
+              </Text>
+            </View>
+          }
+        />
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
     </View>
   );
 }
@@ -133,24 +237,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  header: {
+  subHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
+    paddingTop: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  headerSubtitle: {
+  subHeaderText: {
     fontSize: 14,
     color: '#6b7280',
-    marginTop: 4,
+    fontWeight: '500',
   },
   autoRefreshIndicator: {
     flexDirection: 'row',
@@ -223,6 +323,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
+  },
+  searchContainer: {
+    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
+  },
+  filterContainer: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 8,
+  },
+  filterScroll: {
+    paddingHorizontal: 16,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filterChipActive: {
+    backgroundColor: '#7a0019',
+    borderColor: '#7a0019',
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'capitalize',
+  },
+  filterChipTextActive: {
+    color: '#fff',
   },
 });
 

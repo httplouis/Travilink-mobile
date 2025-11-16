@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Platform,
   Animated,
+  Image,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboard } from '@/hooks/useDashboard';
@@ -16,31 +17,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { formatDate, formatTime } from '@/lib/utils';
 import SidebarMenu from '@/components/SidebarMenu';
+import NavigationHeader from '@/components/NavigationHeader';
 
 export default function DashboardScreen() {
   const { profile, loading: authLoading } = useAuth();
-  const { kpis, vehicles, trips, isLoading, refetch } = useDashboard(profile?.id || '');
+  const { kpis, vehicles, drivers, trips, isLoading, refetch } = useDashboard(profile?.id || '');
   const [refreshing, setRefreshing] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
-
-  if (authLoading || !profile) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#7a0019" />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
-
+  // All hooks must be called BEFORE any early returns
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -62,24 +50,35 @@ export default function DashboardScreen() {
     ]).start();
 
     return () => clearInterval(timer);
-  }, []);
+  }, [fadeAnim, slideAnim]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
+  if (authLoading || !profile) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#7a0019" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   const day = currentTime.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
     <View style={styles.container}>
-      {/* Header with Menu */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-        <TouchableOpacity
-          onPress={() => setSidebarVisible(true)}
-          style={styles.menuButton}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="menu-outline" size={28} color="#111827" />
-        </TouchableOpacity>
-      </View>
+      {/* Header with Menu and Notifications */}
+      <NavigationHeader
+        title="Dashboard"
+        onMenuPress={() => setSidebarVisible(true)}
+        showNotification={true}
+        showMenu={true}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -107,22 +106,6 @@ export default function DashboardScreen() {
             <Ionicons name="time-outline" size={14} color="#fff" />
             <Text style={styles.heroTime}>{time}</Text>
           </View>
-        </View>
-        <View style={styles.heroActions}>
-          <TouchableOpacity
-            style={styles.heroButtonPrimary}
-            onPress={() => router.push('/request/new')}
-          >
-            <Ionicons name="add" size={18} color="#7a0019" />
-            <Text style={styles.heroButtonPrimaryText}>New request</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.heroButtonSecondary}
-            onPress={() => router.push('/(tabs)/calendar')}
-          >
-            <Ionicons name="calendar-outline" size={18} color="#fff" />
-            <Text style={styles.heroButtonSecondaryText}>Schedule</Text>
-          </TouchableOpacity>
         </View>
       </Animated.View>
 
@@ -164,28 +147,31 @@ export default function DashboardScreen() {
         </View>
         <View style={styles.quickActionsGrid}>
           <QuickActionButton
-            icon="add-circle-outline"
-            label="New request"
-            color="#3b82f6"
-            onPress={() => router.push('/(tabs)/request')}
+            icon="person-circle-outline"
+            label="Edit Profile"
+            color="#7a0019"
+            onPress={() => router.push('/profile')}
           />
           <QuickActionButton
-            icon="calendar-outline"
-            label="Schedule"
-            color="#10b981"
-            onPress={() => router.push('/(tabs)/calendar')}
+            icon="time-outline"
+            label="Set Status"
+            color="#2563eb"
+            onPress={() => {
+              // Open sidebar to set availability
+              setSidebarVisible(true);
+            }}
           />
           <QuickActionButton
-            icon="list-outline"
-            label="My requests"
-            color="#8b5cf6"
-            onPress={() => router.push('/(tabs)/submissions')}
-          />
-          <QuickActionButton
-            icon="help-circle-outline"
-            label="Help"
+            icon="star-outline"
+            label="Feedback"
             color="#f59e0b"
-            onPress={() => router.push('/help')}
+            onPress={() => router.push('/feedback')}
+          />
+          <QuickActionButton
+            icon="settings-outline"
+            label="Settings"
+            color="#6b7280"
+            onPress={() => router.push('/profile/settings')}
           />
         </View>
       </Animated.View>
@@ -210,21 +196,38 @@ export default function DashboardScreen() {
         </View>
       )}
 
+      {/* Available Drivers */}
+      {drivers.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderLeft}>
+              <Ionicons name="person-outline" size={20} color="#7a0019" />
+              <Text style={styles.sectionTitle}>Available Drivers</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/drivers')}>
+              <Text style={styles.viewAllLink}>View All →</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehiclesScroll}>
+            {drivers.slice(0, 3).map((driver) => (
+              <DriverCard key={driver.id} driver={driver} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Upcoming Trips */}
       {trips.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming (next 6)</Text>
-          {trips.map((trip) => (
+          <Text style={styles.sectionTitle}>Upcoming Trips</Text>
+          {trips.slice(0, 6).map((trip) => (
             <TripCard key={trip.id} trip={trip} />
           ))}
         </View>
       )}
 
-      {/* Availability Heatmap */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Capacity (next 30 days)</Text>
-        <AvailabilityHeatmap trips={trips} />
-      </View>
+      {/* Bottom padding to account for navbar */}
+      <View style={{ height: Platform.OS === 'ios' ? 100 : 80 }} />
       </ScrollView>
       <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
     </View>
@@ -286,7 +289,7 @@ function QuickActionButton({
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
-      toValue: 0.95,
+      toValue: 0.97,
       useNativeDriver: true,
     }).start();
   };
@@ -308,14 +311,15 @@ function QuickActionButton({
       <Animated.View
         style={[
           styles.quickActionButton,
-          { backgroundColor: color + '20' },
           {
             transform: [{ scale: scaleAnim }],
           },
         ]}
       >
-        <Ionicons name={icon} size={24} color={color} />
-        <Text style={[styles.quickActionLabel, { color }]}>{label}</Text>
+        <View style={[styles.quickActionIconContainer, { backgroundColor: color }]}>
+          <Ionicons name={icon} size={22} color="#fff" />
+        </View>
+        <Text style={styles.quickActionLabel}>{label}</Text>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -335,10 +339,42 @@ function VehicleCard({ vehicle }: { vehicle: any }) {
       </Text>
       <Text style={styles.vehiclePlate}>{vehicle.plate_number}</Text>
       <View style={styles.vehicleCapacity}>
-                <Ionicons name="people-outline" size={14} color="#6b7280" />
+        <Ionicons name="people-outline" size={14} color="#6b7280" />
         <Text style={styles.vehicleCapacityText}>{vehicle.capacity} seats</Text>
       </View>
     </View>
+  );
+}
+
+function DriverCard({ driver }: { driver: any }) {
+  return (
+    <TouchableOpacity
+      style={styles.driverCard}
+      onPress={() => router.push('/drivers')}
+      activeOpacity={0.7}
+    >
+      {driver.profile_picture ? (
+        <Image source={{ uri: driver.profile_picture }} style={styles.driverAvatar} />
+      ) : (
+        <View style={styles.driverAvatar}>
+          <Text style={styles.driverAvatarText}>
+            {driver.name?.charAt(0).toUpperCase() || 'D'}
+          </Text>
+        </View>
+      )}
+      <View style={styles.driverStatusBadge}>
+        <View style={styles.driverStatusDot} />
+        <Text style={styles.driverStatusText}>Available</Text>
+      </View>
+      <Text style={styles.driverName} numberOfLines={1}>
+        {driver.name}
+      </Text>
+      {driver.position_title && (
+        <Text style={styles.driverPosition} numberOfLines={1}>
+          {driver.position_title}
+        </Text>
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -446,25 +482,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  menuButton: {
-    padding: 4,
-  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -550,7 +567,9 @@ const styles = StyleSheet.create({
   },
   kpiRow: {
     flexDirection: 'row',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
     gap: 12,
   },
   kpiCard: {
@@ -561,6 +580,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   kpiIconContainer: {
     width: 48,
@@ -591,6 +615,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -618,27 +647,37 @@ const styles = StyleSheet.create({
     color: '#7a0019',
   },
   quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
   },
   quickActionButton: {
-    width: '47%',
-    aspectRatio: 1.2,
-    borderRadius: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    justifyContent: 'flex-start',
+    gap: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
   },
+  quickActionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   quickActionLabel: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
+    color: '#111827',
+    flex: 1,
   },
   vehiclesScroll: {
     marginHorizontal: -16,
@@ -647,11 +686,16 @@ const styles = StyleSheet.create({
   vehicleCard: {
     width: 160,
     marginRight: 12,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#fff',
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
   },
   vehicleImagePlaceholder: {
     width: '100%',
@@ -699,13 +743,80 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
+  driverCard: {
+    width: 160,
+    marginRight: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  driverAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#7a0019',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  driverAvatarText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  driverStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  driverStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#16a34a',
+  },
+  driverStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  driverName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  driverPosition: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
   tripCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   tripHeader: {
     flexDirection: 'row',

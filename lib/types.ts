@@ -184,6 +184,7 @@ export interface Notification {
 export interface Booking {
   id: string;
   dateISO: string; // "YYYY-MM-DD"
+  endDateISO?: string; // "YYYY-MM-DD" - for multi-day trips
   vehicle: UIVehicleType;
   vehicleName: string;
   driver: string;
@@ -194,6 +195,9 @@ export interface Booking {
   returnAt: string; // "HH:mm"
   status: RequestStatus;
 }
+
+// User Availability Status
+export type AvailabilityStatus = 'online' | 'busy' | 'off_work' | 'on_leave';
 
 // User Profile Interface
 export interface UserProfile {
@@ -217,6 +221,7 @@ export interface UserProfile {
   phone_number: string | null;
   position_title: string | null;
   status: 'active' | 'inactive';
+  availability_status?: AvailabilityStatus;
 }
 
 // Department Interface

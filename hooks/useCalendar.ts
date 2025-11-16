@@ -12,6 +12,8 @@ export function useCalendar(userId: string, startDate: Date, endDate: Date) {
         return [];
       }
 
+      // Fetch all approved/pending requests within date range (not just user's requests)
+      // This matches web version behavior - showing all bookings on the calendar
       const { data, error } = await supabase
         .from('requests')
         .select(`
@@ -24,12 +26,12 @@ export function useCalendar(userId: string, startDate: Date, endDate: Date) {
           status,
           department_id,
           assigned_vehicle_id,
-          assigned_driver_id
+          assigned_driver_id,
+          requester_id
         `)
-        .eq('requester_id', userId)
-        .in('status', ['approved', 'pending_admin', 'pending_exec', 'pending_hr'] as RequestStatus[])
-        .gte('travel_start_date', startDate.toISOString())
-        .lte('travel_end_date', endDate.toISOString())
+        .in('status', ['approved', 'pending_admin', 'pending_exec', 'pending_hr', 'pending_head'] as RequestStatus[])
+        .gte('travel_start_date', startDate.toISOString().split('T')[0])
+        .lte('travel_end_date', endDate.toISOString().split('T')[0])
         .order('travel_start_date', { ascending: true });
 
       if (error) throw error;
@@ -89,6 +91,7 @@ export function useCalendar(userId: string, startDate: Date, endDate: Date) {
       const bookings: Booking[] = bookingsWithDetails.map((req: any) => ({
         id: req.request_number || req.id,
         dateISO: extractDate(req.travel_start_date),
+        endDateISO: req.travel_end_date ? extractDate(req.travel_end_date) : undefined,
         vehicle: mapVehicleType(req.assigned_vehicle?.type || 'van'),
         vehicleName: req.assigned_vehicle
           ? `${req.assigned_vehicle.vehicle_name} (${req.assigned_vehicle.plate_number})`

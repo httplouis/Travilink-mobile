@@ -51,7 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           profile_picture,
           phone_number,
           position_title,
-          status
+          status,
+          availability_status
         `)
         .eq('auth_user_id', userId)
         .single();
@@ -110,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         phone_number: data.phone_number,
         position_title: data.position_title,
         status: data.status || 'active',
+        availability_status: (data.availability_status as 'online' | 'busy' | 'off_work' | 'on_leave') || 'online',
       };
     } catch (error) {
       console.error('[AuthContext] Exception in fetchProfile:', error);
@@ -274,16 +276,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
+      console.log('[AuthContext] Auth state changed:', event, session?.user?.email || 'no user');
+      
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const userProfile = await fetchProfile(session.user.id);
-        if (mounted) {
-          setProfile(userProfile);
+        // For SIGNED_IN events (like OAuth), fetch profile but don't block
+        if (event === 'SIGNED_IN') {
+          console.log('[AuthContext] User signed in, fetching profile in background...');
+          // Fetch profile without blocking (allow navigation to proceed)
+          fetchProfile(session.user.id).then((userProfile) => {
+            if (mounted) {
+              setProfile(userProfile);
+            }
+          }).catch((error) => {
+            console.error('[AuthContext] Profile fetch error after sign in:', error);
+            // Don't block - continue without profile
+          });
+        } else {
+          // For other events (like TOKEN_REFRESHED), fetch normally
+          const userProfile = await fetchProfile(session.user.id);
+          if (mounted) {
+            setProfile(userProfile);
+          }
         }
       } else {
         setProfile(null);
