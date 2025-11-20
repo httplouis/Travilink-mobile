@@ -328,9 +328,13 @@ function QuickActionButton({
 function VehicleCard({ vehicle }: { vehicle: any }) {
   return (
     <View style={styles.vehicleCard}>
-      <View style={styles.vehicleImagePlaceholder}>
-        <Ionicons name="car-outline" size={32} color="#9ca3af" />
-      </View>
+      {vehicle.photo_url ? (
+        <Image source={{ uri: vehicle.photo_url }} style={styles.vehicleImage} resizeMode="cover" />
+      ) : (
+        <View style={styles.vehicleImagePlaceholder}>
+          <Ionicons name="car-outline" size={32} color="#9ca3af" />
+        </View>
+      )}
       <View style={styles.vehicleStatusBadge}>
         <Text style={styles.vehicleStatusText}>Available</Text>
       </View>
@@ -696,6 +700,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
+  },
+  vehicleImage: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#e5e7eb',
   },
   vehicleImagePlaceholder: {
     width: '100%',

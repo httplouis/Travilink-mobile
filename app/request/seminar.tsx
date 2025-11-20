@@ -27,6 +27,8 @@ import LocationField from '@/components/LocationField';
 import CurrencyInput from '@/components/CurrencyInput';
 import SignaturePad from '@/components/SignaturePad';
 import SidebarMenu from '@/components/SidebarMenu';
+import FileAttachmentPicker, { AttachmentFile } from '@/components/FileAttachmentPicker';
+import { uploadFilesToStorage } from '@/lib/storage';
 
 // Types matching web exactly
 interface BreakdownItem {
@@ -74,6 +76,7 @@ interface SeminarData {
   applicants: Applicant[];
   participantInvitations: ParticipantInvitation[];
   allParticipantsConfirmed: boolean;
+  requesterContactNumber?: string;
 }
 
 const TRAINING_TYPES = ['Compliance', 'Professional Development'] as const;
@@ -108,6 +111,8 @@ export default function SeminarScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const [formData, setFormData] = useState<SeminarData>({
     applicationDate: new Date().toISOString().split('T')[0],
@@ -129,6 +134,7 @@ export default function SeminarScreen() {
     applicants: [],
     participantInvitations: [],
     allParticipantsConfirmed: false,
+    requesterContactNumber: '',
   });
 
   // Auto-calculate days
@@ -218,6 +224,17 @@ export default function SeminarScreen() {
       newErrors['seminar.requesterSignature'] = "Organizer's signature is required";
     }
 
+    // Contact number validation (if provided, must be valid format)
+    if (formData.requesterContactNumber && formData.requesterContactNumber.trim()) {
+      const phone = formData.requesterContactNumber.trim();
+      const philippinesPhoneRegex = /^(\+63|0)?9\d{9}$/;
+      const cleanPhone = phone.replace(/[\s-]/g, '');
+      
+      if (!philippinesPhoneRegex.test(cleanPhone) && !cleanPhone.startsWith('+63') && !cleanPhone.startsWith('09')) {
+        newErrors['seminar.requesterContactNumber'] = 'Please enter a valid Philippines phone number (+63XXXXXXXXXX or 09XXXXXXXXX)';
+      }
+    }
+
     setErrors(newErrors);
     return { ok: Object.keys(newErrors).length === 0, errors: newErrors };
   };
@@ -260,6 +277,24 @@ export default function SeminarScreen() {
 
       const totalBudget = expenseBreakdown.reduce((sum, item) => sum + item.amount, 0);
       const hasBudget = totalBudget > 0 || (formData.registrationCost || 0) > 0 || (formData.totalAmount || 0) > 0;
+
+      // Upload attachments if any
+      let uploadedAttachments: any[] = [];
+      if (attachments.length > 0 && status === 'submitted') {
+        try {
+          uploadedAttachments = await uploadFilesToStorage(attachments, profile.id);
+        } catch (uploadError: any) {
+          console.error('Error uploading attachments:', uploadError);
+          Alert.alert(
+            'Upload Error',
+            'Failed to upload some attachments. Do you want to continue without them?',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => { setSubmitting(false); return; } },
+              { text: 'Continue', onPress: () => {} },
+            ]
+          );
+        }
+      }
 
       // Determine initial status using workflow engine logic
       const requesterIsHead = profile.is_head || false;
@@ -320,6 +355,8 @@ export default function SeminarScreen() {
                 : initialStatus === 'pending_exec'
                   ? 'exec'
                   : null,
+        requester_contact_number: formData.requesterContactNumber || null,
+        attachments: uploadedAttachments.length > 0 ? uploadedAttachments : null,
         // Seminar-specific data
         seminar_data: {
           applicationDate: formData.applicationDate || new Date().toISOString().split('T')[0],
@@ -427,6 +464,7 @@ export default function SeminarScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          scrollEnabled={scrollEnabled}
         >
           {/* Form Container */}
           <View style={styles.formContainer}>
@@ -722,6 +760,37 @@ export default function SeminarScreen() {
               />
             </View>
 
+            {/* Contact Number Section */}
+            <View style={styles.section}>
+              <Text style={styles.label}>
+                Contact Number for Driver/Coordination <Text style={styles.optional}>(Optional)</Text>
+              </Text>
+              <RNTextInput
+                style={[styles.input, errors['seminar.requesterContactNumber'] && styles.inputError]}
+                placeholder="+63XXXXXXXXXX or 09XXXXXXXXX"
+                placeholderTextColor="#9ca3af"
+                value={formData.requesterContactNumber || ''}
+                onChangeText={(text) => handleChange({ requesterContactNumber: text })}
+                keyboardType="phone-pad"
+              />
+              <Text style={styles.helperText}>
+                Provide your contact number for driver coordination
+              </Text>
+              {errors['seminar.requesterContactNumber'] && (
+                <Text style={styles.errorText}>{errors['seminar.requesterContactNumber']}</Text>
+              )}
+            </View>
+
+            {/* File Attachments Section */}
+            <View style={styles.section}>
+              <FileAttachmentPicker
+                files={attachments}
+                onChange={setAttachments}
+                error={errors['seminar.attachments']}
+                disabled={submitting || savingDraft}
+              />
+            </View>
+
             {/* Organizer's Signature */}
             <View style={styles.section}>
               <View style={styles.signatureHeader}>
@@ -750,6 +819,8 @@ export default function SeminarScreen() {
                   value={formData.requesterSignature || null}
                   onSave={(dataUrl) => handleChange({ requesterSignature: dataUrl })}
                   onClear={() => handleChange({ requesterSignature: '' })}
+                  onDrawingStart={() => setScrollEnabled(false)}
+                  onDrawingEnd={() => setScrollEnabled(true)}
                   hideSaveButton
                 />
               </View>
@@ -1041,6 +1112,8 @@ function ApplicantsEditor({
                 value={list[signatureModal.index]?.signature || null}
                 onSave={(dataUrl) => saveSignature(signatureModal.index, dataUrl)}
                 onClear={() => setRow(signatureModal.index, { signature: null })}
+                onDrawingStart={() => setScrollEnabled(false)}
+                onDrawingEnd={() => setScrollEnabled(true)}
                 hideSaveButton
               />
             )}
@@ -1186,6 +1259,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fecaca',
     backgroundColor: '#fef2f2',
+  },
+  optional: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#6b7280',
   },
   helperText: {
     fontSize: 12,

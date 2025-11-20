@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Modal,
   Platform,
   TextInput,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDepartments } from '@/hooks/useDepartments';
@@ -34,9 +37,69 @@ export default function DepartmentSelect({
 }: DepartmentSelectProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const screenHeight = Dimensions.get('window').height;
+  const translateY = useRef(new Animated.Value(screenHeight * 0.4)).current; // Start at 40% from bottom
 
   // Fetch departments
   const { data: departments = [], isLoading } = useDepartments();
+
+  // Pan responder for swipe gestures - ONLY on header area
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to vertical swipes on the header area
+        return Math.abs(gestureState.dy) > 5 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderGrant: () => {
+        translateY.setOffset(translateY._value);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Only allow downward swipes (positive dy)
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        translateY.flattenOffset();
+        const shouldClose = gestureState.dy > 100 || gestureState.vy > 0.5;
+        if (shouldClose) {
+          Animated.timing(translateY, {
+            toValue: screenHeight,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setIsModalOpen(false);
+            translateY.setValue(screenHeight * 0.4);
+          });
+        } else {
+          // Snap to top or bottom
+          const targetY = gestureState.dy < -50 ? 0 : screenHeight * 0.4;
+          Animated.spring(translateY, {
+            toValue: targetY,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 7,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  // Animate modal when opening
+  React.useEffect(() => {
+    if (isModalOpen) {
+      translateY.setValue(screenHeight * 0.4);
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }).start();
+    } else {
+      translateY.setValue(screenHeight * 0.4);
+    }
+  }, [isModalOpen]);
 
   // Format department display name
   const formatDepartment = (dept: { name: string; code?: string }) => {
@@ -83,7 +146,8 @@ export default function DepartmentSelect({
       >
         <Text
           style={[styles.input, !value && styles.inputPlaceholder]}
-          numberOfLines={1}
+          numberOfLines={2}
+          ellipsizeMode="tail"
         >
           {value || placeholder}
         </Text>
@@ -103,9 +167,26 @@ export default function DepartmentSelect({
         animationType="slide"
         onRequestClose={() => setIsModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsModalOpen(false)}
+        >
+        <Animated.View
+          style={[
+            styles.modal,
+            {
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+            {/* Header with swipe gesture - ONLY this area is swipeable */}
+            <Animated.View 
+              style={styles.modalHeader}
+              {...panResponder.panHandlers}
+            >
+              {/* Swipe indicator */}
+              <View style={styles.swipeIndicator} />
               <Text style={styles.modalTitle}>Select Department</Text>
               <TouchableOpacity
                 onPress={() => setIsModalOpen(false)}
@@ -113,7 +194,7 @@ export default function DepartmentSelect({
               >
                 <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
-            </View>
+            </Animated.View>
 
             {/* Search Bar */}
             <View style={styles.searchContainer}>
@@ -133,7 +214,7 @@ export default function DepartmentSelect({
               )}
             </View>
 
-            {/* Departments List */}
+            {/* Departments List - Content area, NO swipe gesture here */}
             {isLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#7a0019" />
@@ -149,9 +230,9 @@ export default function DepartmentSelect({
                 data={filteredDepartments}
                 keyExtractor={(item) => item.id}
                 style={styles.list}
-                nestedScrollEnabled={true}
                 scrollEnabled={true}
                 removeClippedSubviews={false}
+                nestedScrollEnabled={false}
                 renderItem={({ item }) => {
                   const formatted = formatDepartment(item);
                   const isSelected = value === formatted;
@@ -176,8 +257,8 @@ export default function DepartmentSelect({
                 }}
               />
             )}
-          </View>
-        </View>
+          </Animated.View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -199,12 +280,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 44,
+    minHeight: 44,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#e5e7eb',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   inputContainerError: {
     borderColor: '#dc2626',
@@ -220,6 +302,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontWeight: '500',
     marginRight: 8,
+    flexWrap: 'wrap',
   },
   inputPlaceholder: {
     color: '#9ca3af',
@@ -247,16 +330,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: '95%',
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    minHeight: '60%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  swipeIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#d1d5db',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 8,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
+    paddingTop: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    minHeight: 60, // Make header area larger for easier swiping
   },
   modalTitle: {
     fontSize: 18,

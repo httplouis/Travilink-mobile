@@ -33,8 +33,10 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
   React.useEffect(() => {
     if (visible) {
       setShouldRender(true);
+      // Reset animation value immediately
       slideAnim.setValue(-Dimensions.get('window').width);
-      const timer = setTimeout(() => {
+      // Use requestAnimationFrame to ensure the value is set before animating
+      requestAnimationFrame(() => {
         Animated.spring(slideAnim, {
           toValue: 0,
           useNativeDriver: true,
@@ -42,8 +44,7 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
           friction: 8,
           velocity: 0,
         }).start();
-      }, 10);
-      return () => clearTimeout(timer);
+      });
     } else {
       Animated.timing(slideAnim, {
         toValue: -Dimensions.get('window').width,
@@ -87,6 +88,11 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
   // Filter menu items - only items not in bottom nav
   const menuItems = [
     {
+      icon: 'home-outline' as const,
+      label: 'Home',
+      path: '/(tabs)/home',
+    },
+    {
       icon: 'car-outline' as const,
       label: 'Vehicles',
       path: '/vehicles',
@@ -126,6 +132,7 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
     return null;
   }
 
+  // Only render modal when it should be visible or is animating out
   return (
     <Modal
       visible={visible || shouldRender}

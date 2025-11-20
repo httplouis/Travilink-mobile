@@ -135,6 +135,34 @@ export interface Request {
   rejection_reason: string | null;
   rejection_stage: string | null;
   
+  // File Attachments
+  attachments?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    mime: string;
+    size: number;
+    uploaded_at: string;
+    uploaded_by: string;
+  }> | null;
+  
+  // Contact Information
+  requester_contact_number?: string | null;
+  driver_contact_number?: string | null;
+  sms_notification_sent?: boolean;
+  sms_sent_at?: string | null;
+  
+  // Request Codes
+  file_code?: string | null;
+  seminar_code_per_person?: Array<{
+    person_id: string;
+    name: string;
+    code: string;
+  }> | null;
+  
+  // Pickup/Transportation
+  pickup_preference?: 'pickup' | 'self' | 'gymnasium' | null;
+  
   // Relations
   department?: {
     id: string;

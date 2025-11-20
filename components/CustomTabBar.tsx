@@ -21,6 +21,27 @@ export default function CustomTabBar() {
     const routePath = route.replace(/[()]/g, '').replace(/^\/tabs\//, '');
     const currentPath = segments.join('/').replace(/[()]/g, '');
     const tabName = routePath.split('/').pop() || routePath;
+    
+    // Special handling for nested routes
+    if (tabName === 'request') {
+      // Match request tab for: request, request/travel-order, request/seminar, etc.
+      return currentPath === `tabs/${tabName}` || 
+             currentPath === tabName || 
+             currentPath.includes(`/${tabName}/`) ||
+             currentPath.includes(`request/`);
+    }
+    
+    if (tabName === 'more') {
+      // Match more tab for: more, vehicles, drivers, profile/settings, help
+      return currentPath === `tabs/${tabName}` || 
+             currentPath === tabName || 
+             currentPath.includes(`/${tabName}/`) ||
+             currentPath === 'vehicles' ||
+             currentPath === 'drivers' ||
+             currentPath.includes('profile/') ||
+             currentPath === 'help';
+    }
+    
     return currentPath === `tabs/${tabName}` || currentPath === tabName || currentPath.includes(`/${tabName}`);
   };
 

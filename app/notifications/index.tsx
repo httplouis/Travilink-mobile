@@ -21,6 +21,7 @@ import { formatTimeAgo } from '@/lib/utils';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import NavigationHeader from '@/components/NavigationHeader';
+import CustomTabBar from '@/components/CustomTabBar';
 import SidebarMenu from '@/components/SidebarMenu';
 
 type NotificationsTab = 'unread' | 'all';
@@ -246,6 +247,7 @@ export default function NotificationsScreen() {
         />
       )}
       <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
+      <CustomTabBar />
     </View>
   );
 }

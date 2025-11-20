@@ -15,17 +15,37 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 // Conditionally import react-native-maps only on native platforms
+// IMPORTANT: Even if require succeeds, the native module may not be available in Expo Go
+// So we'll check at runtime if MapView actually works
 let MapView: any = null;
 let Marker: any = null;
 let PROVIDER_GOOGLE: any = null;
+let MapViewAvailable = false; // Track if MapView is actually usable
+
 if (Platform.OS !== 'web') {
   try {
     const Maps = require('react-native-maps');
-    MapView = Maps.default;
-    Marker = Maps.Marker;
-    PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+    // Check if the module exists, but don't assume it works
+    // We'll test it at runtime
+    if (Maps && Maps.default) {
+      MapView = Maps.default;
+      Marker = Maps.Marker;
+      PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+      // Don't set MapViewAvailable = true here - we'll check at runtime
+    }
   } catch (error) {
-    console.warn('react-native-maps not available:', error);
+    console.warn('[MapPicker] react-native-maps module not found:', error);
+    MapViewAvailable = false;
+  }
+}
+
+// Import WebView for Leaflet.js fallback map (works in Expo Go, completely free)
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    WebView = require('react-native-webview').WebView;
+  } catch (error) {
+    console.warn('react-native-webview not available:', error);
   }
 }
 
@@ -58,15 +78,22 @@ type NominatimHit = {
   lon: string;
 };
 
-// Debounce hook
+// Debounce hook - fixed to prevent infinite loops
 function useDebounce<T extends (...args: any[]) => void>(fn: T, delay = 400) {
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const fnRef = React.useRef(fn);
+  
+  // Update ref when fn changes
+  React.useEffect(() => {
+    fnRef.current = fn;
+  }, [fn]);
+  
   return useCallback(
     (...args: Parameters<T>) => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => fn(...args), delay);
+      timeoutRef.current = setTimeout(() => fnRef.current(...args), delay);
     },
-    [fn, delay]
+    [delay] // Only depend on delay, not fn
   );
 }
 
@@ -128,6 +155,117 @@ async function nominatimReverse(lat: number, lng: number): Promise<string | null
   }
 }
 
+// Leaflet.js WebView Map Component - Works in Expo Go, completely free, no API key needed
+function LeafletMapWebView({
+  mapRegion,
+  selectedPlace,
+  onMapClick,
+}: {
+  mapRegion: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
+  selectedPlace: PickedPlace | null;
+  onMapClick: (event: any) => void;
+}) {
+  const webViewRef = React.useRef<any>(null);
+
+  // Update map when region or selected place changes
+  React.useEffect(() => {
+    if (webViewRef.current) {
+      const script = `
+        if (window.map) {
+          window.map.setView([${mapRegion.latitude}, ${mapRegion.longitude}], 13);
+          ${selectedPlace ? `
+            if (window.selectedMarker) {
+              window.map.removeLayer(window.selectedMarker);
+            }
+            window.selectedMarker = L.marker([${selectedPlace.lat}, ${selectedPlace.lng}]).addTo(window.map);
+            window.selectedMarker.bindPopup('${selectedPlace.address.replace(/'/g, "\\'")}').openPopup();
+          ` : `
+            if (window.selectedMarker) {
+              window.map.removeLayer(window.selectedMarker);
+              window.selectedMarker = null;
+            }
+          `}
+        }
+      `;
+      webViewRef.current.injectJavaScript(script);
+    }
+  }, [mapRegion, selectedPlace]);
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body, html { width: 100%; height: 100%; overflow: hidden; }
+          #map { width: 100%; height: 100%; }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          window.map = L.map('map').setView([${mapRegion.latitude}, ${mapRegion.longitude}], 13);
+          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+          }).addTo(window.map);
+          
+          ${selectedPlace ? `
+            window.selectedMarker = L.marker([${selectedPlace.lat}, ${selectedPlace.lng}]).addTo(window.map);
+            window.selectedMarker.bindPopup('${selectedPlace.address.replace(/'/g, "\\'")}').openPopup();
+          ` : ''}
+          
+          let currentMarker = null;
+          window.map.on('click', function(e) {
+            if (currentMarker) {
+              window.map.removeLayer(currentMarker);
+            }
+            currentMarker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(window.map);
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'mapClick',
+                lat: e.latlng.lat,
+                lng: e.latlng.lng
+              }));
+            }
+          });
+        </script>
+      </body>
+    </html>
+  `;
+
+  return (
+    <WebView
+      ref={webViewRef}
+      style={styles.map}
+      source={{ html: htmlContent }}
+      onMessage={(event) => {
+        try {
+          const data = JSON.parse(event.nativeEvent.data);
+          if (data.type === 'mapClick') {
+            onMapClick({
+              nativeEvent: {
+                coordinate: {
+                  latitude: data.lat,
+                  longitude: data.lng,
+                },
+              },
+            });
+          }
+        } catch (error) {
+          console.error('Error parsing map message:', error);
+        }
+      }}
+      javaScriptEnabled={true}
+      domStorageEnabled={true}
+      allowsInlineMediaPlayback={true}
+    />
+  );
+}
+
 export default function MapPicker({ open, onClose, onPick, initial }: MapPickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<NominatimHit[]>([]);
@@ -135,16 +273,39 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
   const [selectedPlace, setSelectedPlace] = useState<PickedPlace | null>(
     initial || null
   );
-  const [mapRegion, setMapRegion] = useState({
-    latitude: initial?.lat || 14.5995, // Manila default
-    longitude: initial?.lng || 120.9842,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+  const [mapError, setMapError] = useState<string | null>(null);
+  // Default to false - always use WebView in Expo Go (works everywhere, no native module needed)
+  const [mapViewActuallyWorks, setMapViewActuallyWorks] = React.useState(false);
+
+  // Always use WebView fallback - it works in Expo Go without native modules
+  // MapView requires native build which doesn't work in Expo Go
+  React.useEffect(() => {
+    if (open) {
+      // Always use WebView - it's safer and works everywhere
+      setMapViewActuallyWorks(false);
+      setMapError(null);
+    }
+  }, [open]);
+  const [mapRegion, setMapRegion] = useState(() => {
+    if (initial?.lat && initial?.lng) {
+      return {
+        latitude: initial.lat,
+        longitude: initial.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+    }
+    return {
+      latitude: 14.5995, // Manila default
+      longitude: 120.9842,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    };
   });
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
 
-  // Debounced search
-  const debouncedSearch = useDebounce(async (query: string) => {
+  // Debounced search - use useCallback to prevent recreation
+  const performSearch = useCallback(async (query: string) => {
     const trimmed = query.trim();
     if (!trimmed) {
       setSearchResults([]);
@@ -161,7 +322,9 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
     } finally {
       setIsSearching(false);
     }
-  }, 450);
+  }, []);
+
+  const debouncedSearch = useDebounce(performSearch, 450);
 
   useEffect(() => {
     if (searchQuery) {
@@ -293,63 +456,135 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
                   <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
                 </TouchableOpacity>
               )}
-              nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
             />
           </View>
         )}
 
-        {/* Map - Only on native platforms */}
-        {Platform.OS !== 'web' && MapView ? (
-          <View style={styles.mapContainer}>
-            <MapView
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-              style={styles.map}
-              region={mapRegion}
-              onRegionChangeComplete={setMapRegion}
-              onPress={handleMapPress}
-              showsUserLocation={true}
-              showsMyLocationButton={true}
-            >
-              {selectedPlace && Marker && (
-                <Marker
-                  coordinate={{
-                    latitude: selectedPlace.lat,
-                    longitude: selectedPlace.lng,
-                  }}
-                  title={selectedPlace.address}
-                />
-              )}
-            </MapView>
-            
-            {isReverseGeocoding && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color="#7a0019" />
-                <Text style={styles.loadingText}>Getting address...</Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          // Web fallback: Search-only mode
-          <View style={styles.webContainer}>
-            <View style={styles.webMessage}>
-              <Ionicons name="location-outline" size={48} color="#9ca3af" />
-              <Text style={styles.webTitle}>Location Search</Text>
-              <Text style={styles.webText}>
-                Search for a location above. Tap on a result to select it.
-              </Text>
-              {selectedPlace && (
-                <View style={styles.selectedPreview}>
-                  <Text style={styles.selectedPreviewLabel}>Selected Location:</Text>
-                  <Text style={styles.selectedPreviewAddress}>{selectedPlace.address}</Text>
-                  <Text style={styles.selectedPreviewCoords}>
-                    {selectedPlace.lat.toFixed(6)}, {selectedPlace.lng.toFixed(6)}
-                  </Text>
+        {/* Map - Always show map container, use WebView Leaflet.js if react-native-maps not available */}
+        <View style={styles.mapContainer}>
+          {Platform.OS !== 'web' && MapView && mapViewActuallyWorks ? (
+            <>
+              <MapView
+                // Use OpenStreetMap tiles - completely free, no API key needed
+                provider={undefined}
+                style={styles.map}
+                initialRegion={mapRegion}
+                region={mapRegion}
+                onRegionChangeComplete={(region) => {
+                  // Only update if user manually moved map
+                  if (selectedPlace) {
+                    const distance = Math.sqrt(
+                      Math.pow(region.latitude - selectedPlace.lat, 2) +
+                      Math.pow(region.longitude - selectedPlace.lng, 2)
+                    );
+                    // Only update if moved significantly (more than 0.001 degrees)
+                    if (distance > 0.001) {
+                      setMapRegion(region);
+                    }
+                  } else {
+                    setMapRegion(region);
+                  }
+                }}
+                onPress={handleMapPress}
+                showsUserLocation={true}
+                showsMyLocationButton={true}
+                mapType="standard"
+                loadingEnabled={true}
+                loadingIndicatorColor="#7a0019"
+                loadingBackgroundColor="#f9fafb"
+                onMapReady={() => {
+                  console.log('[MapPicker] Map is ready!');
+                  setMapError(null);
+                }}
+                onError={(error) => {
+                  console.error('[MapPicker] Map error, falling back to WebView:', error);
+                  // If MapView fails, switch to WebView
+                  setMapViewActuallyWorks(false);
+                }}
+              >
+                {/* OpenStreetMap tiles - completely free, no API key needed for both iOS and Android */}
+                {(() => {
+                  try {
+                    const UrlTile = require('react-native-maps').UrlTile;
+                    return (
+                      <UrlTile
+                        urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        maximumZ={19}
+                        flipY={false}
+                      />
+                    );
+                  } catch (error) {
+                    console.warn('[MapPicker] UrlTile not available, using default tiles');
+                    return null;
+                  }
+                })()}
+                {selectedPlace && Marker && (
+                  <Marker
+                    coordinate={{
+                      latitude: selectedPlace.lat,
+                      longitude: selectedPlace.lng,
+                    }}
+                    title={selectedPlace.address}
+                    pinColor="#7a0019"
+                    draggable={true}
+                    onDragEnd={(e) => {
+                      const { latitude, longitude } = e.nativeEvent.coordinate;
+                      handleMapPress({ nativeEvent: { coordinate: { latitude, longitude } } });
+                    }}
+                  />
+                )}
+              </MapView>
+              
+              {isReverseGeocoding && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="large" color="#7a0019" />
+                  <Text style={styles.loadingText}>Getting address...</Text>
                 </View>
               )}
+              
+              {/* Only show error if map truly failed to load */}
+              {mapError && (
+                <View style={styles.mapErrorOverlay}>
+                  <View style={styles.mapErrorContainer}>
+                    <Ionicons name="warning-outline" size={24} color="#f59e0b" />
+                    <Text style={styles.mapErrorText}>{mapError}</Text>
+                    <Text style={styles.mapErrorSubtext}>
+                      You can still search for locations above. The map will work once react-native-maps is properly configured.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          ) : Platform.OS !== 'web' && WebView ? (
+            // Fallback: Use Leaflet.js in WebView - works in Expo Go, completely free, no API key needed
+            <LeafletMapWebView
+              mapRegion={mapRegion}
+              selectedPlace={selectedPlace}
+              onMapClick={handleMapPress}
+            />
+          ) : (
+            // Final fallback: Show message if WebView also not available
+            <View style={styles.webContainer}>
+              <View style={styles.webMessage}>
+                <Ionicons name="location-outline" size={48} color="#9ca3af" />
+                <Text style={styles.webTitle}>Location Search</Text>
+                <Text style={styles.webText}>
+                  Search for a location above. Tap on a result to select it.
+                </Text>
+                {selectedPlace && (
+                  <View style={styles.selectedPreview}>
+                    <Text style={styles.selectedPreviewLabel}>Selected Location:</Text>
+                    <Text style={styles.selectedPreviewAddress}>{selectedPlace.address}</Text>
+                    <Text style={styles.selectedPreviewCoords}>
+                      {selectedPlace.lat.toFixed(6)}, {selectedPlace.lng.toFixed(6)}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        )}
+          )}
+        </View>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -467,10 +702,15 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     position: 'relative',
+    minHeight: 400,
+    backgroundColor: '#e5e7eb',
+    width: '100%',
   },
   map: {
     width: '100%',
     height: '100%',
+    minHeight: 400,
+    flex: 1,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -587,6 +827,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9ca3af',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  mapErrorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  mapErrorContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: '90%',
+  },
+  mapErrorText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400e',
+    lineHeight: 16,
+  },
+  mapErrorSubtext: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#a16207',
+    lineHeight: 14,
   },
 });
 

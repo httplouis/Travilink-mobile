@@ -147,7 +147,7 @@ export default function SubmissionsScreen() {
       />
       <View style={styles.subHeader}>
         <Text style={styles.subHeaderText}>
-          {filteredRequests.length} of {requests.length} request{requests.length !== 1 ? 's' : ''}
+          {`${filteredRequests.length} of ${requests.length} request${requests.length !== 1 ? 's' : ''}`}
         </Text>
       </View>
 

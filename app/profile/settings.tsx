@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -41,7 +42,10 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => router.push('/profile/edit')}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="person-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Edit Profile</Text>
@@ -49,7 +53,16 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => {
+            Alert.alert(
+              'Change Password',
+              'Password changes are managed through Azure MS Teams. Please contact your administrator or use the Teams portal to change your password.',
+              [{ text: 'OK' }]
+            );
+          }}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Change Password</Text>
@@ -93,7 +106,10 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>App</Text>
         
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => router.push('/help')}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="help-circle-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Help & Support</Text>
@@ -101,7 +117,16 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => {
+            Alert.alert(
+              'Terms & Privacy',
+              'TraviLink Mobile respects your privacy. By using this app, you agree to our terms of service and privacy policy. For detailed information, please contact the IT department.',
+              [{ text: 'OK' }]
+            );
+          }}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="document-text-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Terms & Privacy</Text>
@@ -109,7 +134,16 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => {
+            Alert.alert(
+              'About TraviLink Mobile',
+              'TraviLink Mobile v1.0.0\n\nA transportation management system for MSEUF.\n\nDeveloped for efficient travel order and seminar application management.',
+              [{ text: 'OK' }]
+            );
+          }}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="information-circle-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>About</Text>

@@ -135,13 +135,13 @@ export default function CostsSection({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.title}>Travel Cost (estimate)</Text>
           <Text style={styles.subtitle}>Estimate your travel expenses</Text>
         </View>
         {totalCost > 0 && (
           <View style={styles.totalBadge}>
-            <Text style={styles.totalText}>
+            <Text style={styles.totalText} numberOfLines={1} adjustsFontSizeToFit>
               Total: ₱{totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           </View>
@@ -360,12 +360,17 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingBottom: 16,
     borderBottomWidth: 2,
     borderBottomColor: '#e5e7eb',
     marginBottom: 16,
+    gap: 12,
+  },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: 18,
@@ -382,11 +387,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#93c5fd',
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    flexShrink: 0,
+    maxWidth: '48%',
   },
   totalText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#1e40af',
   },
