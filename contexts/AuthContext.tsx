@@ -224,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let profileTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     // Get initial session with timeout
     const initializeAuth = async () => {
@@ -231,7 +232,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Set a timeout to prevent infinite loading
         timeoutId = setTimeout(() => {
           if (mounted) {
-            console.warn('[AuthContext] Initialization timeout, setting loading to false');
+            console.warn('[AuthContext] Initialization timeout after 10s, clearing invalid session');
+            // If we're still loading after 10s, something is wrong - clear session
+            setSession(null);
+            setUser(null);
+            setProfile(null);
             setLoading(false);
           }
         }, 10000); // 10 second timeout
@@ -239,6 +244,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Get session - don't timeout, let Supabase handle it
         // If there's a network issue, we'll retry later rather than signing out
         const { data: { session }, error } = await supabase.auth.getSession();
+        
+        // Validate session - check if it's expired or invalid
+        let validSession = session;
+        if (session) {
+          // Check if session is expired
+          const expiresAt = session.expires_at;
+          if (expiresAt) {
+            const expiresAtDate = new Date(expiresAt * 1000);
+            const now = new Date();
+            if (expiresAtDate < now) {
+              console.warn('[AuthContext] Session expired, clearing...');
+              validSession = null;
+              try {
+                await supabase.auth.signOut();
+              } catch (signOutError) {
+                // Ignore sign out errors
+              }
+            }
+          }
+        }
         
         // Only handle refresh token errors - don't sign out on network timeouts
         if (error) {
@@ -265,7 +290,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             // Network or other errors - log but don't sign out
             console.warn('[AuthContext] Session fetch error (non-critical):', error.message || error.code);
-            // Continue with existing session if available, or null if not
+            // If we have an error and no valid session, clear everything
+            if (!validSession && mounted) {
+              setSession(null);
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
+              return;
+            }
           }
         }
         
@@ -276,24 +308,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!mounted) return;
 
-        // Set session even if there was an error (might be network issue, not auth issue)
-        // Only skip if it was a refresh token error (already handled above)
-        setSession(session);
-        setUser(session?.user ?? null);
+        // Set session only if valid
+        setSession(validSession);
+        setUser(validSession?.user ?? null);
         
-        if (session?.user) {
-          // Fetch profile with timeout
+        if (validSession?.user) {
+          // Fetch profile with timeout - CRITICAL: must succeed or session is invalid
           try {
-            const profilePromise = fetchProfile(session.user.id);
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Profile fetch timeout')), 8000)
-            );
+            // Set a separate timeout for profile fetch (max 8 seconds)
+            profileTimeoutId = setTimeout(() => {
+              if (mounted) {
+                console.warn('[AuthContext] Profile fetch timeout after 8s, clearing session');
+                // Clear session if profile fetch times out
+                try {
+                  supabase.auth.signOut().catch(() => {});
+                } catch (signOutError) {
+                  // Ignore
+                }
+                setSession(null);
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
+              }
+            }, 8000);
             
-            const userProfile = await Promise.race([profilePromise, timeoutPromise]) as UserProfile | null;
+            const userProfile = await fetchProfile(validSession.user.id);
+            
+            if (profileTimeoutId) {
+              clearTimeout(profileTimeoutId);
+              profileTimeoutId = null;
+            }
+            
             if (mounted) {
-              setProfile(userProfile);
+              if (!userProfile) {
+                // No profile means user doesn't exist in database - invalid session
+                console.warn('[AuthContext] No profile found for user, clearing session');
+                try {
+                  await supabase.auth.signOut();
+                } catch (signOutError) {
+                  // Ignore
+                }
+                setSession(null);
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
+              } else {
+                console.log('[AuthContext] Profile loaded successfully:', { id: userProfile.id, name: userProfile.name, role: userProfile.role });
+                setProfile(userProfile);
+                setLoading(false);
+              }
             }
           } catch (profileError: any) {
+            if (profileTimeoutId) {
+              clearTimeout(profileTimeoutId);
+              profileTimeoutId = null;
+            }
+            
             // Don't log HTML error pages, abort errors, or timeouts
             const errorMessage = profileError?.message || '';
             const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
@@ -304,12 +374,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // Only log meaningful errors
               console.warn('[AuthContext] Profile fetch error:', profileError?.code || profileError?.message || 'Unknown error');
             }
+            
+            // If profile fetch fails, clear session - user might not exist
             if (mounted) {
+              console.warn('[AuthContext] Profile fetch failed, clearing session');
+              try {
+                await supabase.auth.signOut();
+              } catch (signOutError) {
+                // Ignore
+              }
+              setSession(null);
+              setUser(null);
               setProfile(null);
+              setLoading(false);
             }
           }
         } else {
-          setProfile(null);
+          // No valid session - clear everything
+          if (mounted) {
+            setProfile(null);
+            setLoading(false);
+          }
         }
       } catch (error: any) {
         // Don't log HTML error pages, abort errors, or timeouts
@@ -326,7 +411,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
-        if (mounted) {
+        if (profileTimeoutId) {
+          clearTimeout(profileTimeoutId);
+        }
+        // Only set loading to false if we haven't already set it elsewhere
+        // (profile fetch sets it after completion)
+        if (mounted && !validSession) {
           setLoading(false);
         }
       }

@@ -8,18 +8,20 @@ import CustomTabBar from '@/components/CustomTabBar';
 import React from 'react';
 
 export default function TabsLayout() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
         <ActivityIndicator size="large" color="#7a0019" />
       </View>
     );
   }
 
-  if (!session) {
+  // If no session OR no profile, redirect to sign-in
+  // Profile is required because role-based access depends on it
+  if (!session || !profile) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
