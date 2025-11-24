@@ -153,10 +153,31 @@ export default function SignInScreen() {
                 return;
               }
 
-              // Always pass the full callback URL to ensure Supabase can match it with the stored code verifier
-              // The redirect URL must match exactly what we passed to signInWithOAuth
+              // CRITICAL: The callback URL format must match the redirect URL format
+              // Supabase stores the code verifier with a key based on the redirect URL
+              // If the formats don't match, Supabase won't find the code verifier
+              console.log('[sign-in] Callback URL received:', result.url);
+              console.log('[sign-in] Expected redirect URL:', redirectTo);
+              
+              // Normalize the callback URL to match the redirect URL format
+              // Extract just the path/query from the callback URL
+              let normalizedCallbackUrl = result.url;
+              try {
+                // If the callback URL is a full URL, extract the relevant parts
+                const callbackUrlObj = new URL(result.url);
+                // Use the scheme and path from redirectTo, but keep query/hash from callback
+                if (redirectTo.startsWith('travilink://')) {
+                  // For deep links, reconstruct with the same scheme
+                  normalizedCallbackUrl = `travilink://auth/callback${callbackUrlObj.search}${callbackUrlObj.hash}`;
+                }
+              } catch (e) {
+                // If URL parsing fails, use the original URL
+                console.warn('[sign-in] Could not parse callback URL, using as-is');
+              }
+              
+              console.log('[sign-in] Normalized callback URL:', normalizedCallbackUrl);
               console.log('[sign-in] Passing callback URL to route...');
-              router.push(`/auth/callback?url=${encodeURIComponent(result.url)}`);
+              router.push(`/auth/callback?url=${encodeURIComponent(normalizedCallbackUrl)}`);
               setLoading(false);
             } else if (result.type === 'cancel') {
               console.log('[sign-in] User cancelled OAuth');

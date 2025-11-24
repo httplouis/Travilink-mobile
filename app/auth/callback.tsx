@@ -234,8 +234,8 @@ export default function AuthCallback() {
           return;
         }
 
-        // Native flow: Check if Supabase already has a session (it might have auto-handled the OAuth)
-        // Supabase stores the PKCE code verifier and can automatically exchange the code
+        // Native flow: For PKCE, Supabase should automatically handle the session
+        // when the callback URL matches the redirect URL. Let's check if a session already exists.
         const { data: existingSession } = await supabase.auth.getSession();
         if (existingSession.session) {
           console.log('[auth/callback] Session already exists, redirecting...');
@@ -245,7 +245,6 @@ export default function AuthCallback() {
         }
 
         // If no session exists and we have a code, try to exchange it
-        // But first, let's check if the URL contains the full callback URL that Supabase expects
         if (!code) {
           console.error('[auth/callback] No code or access_token provided');
           hasProcessedRef.current = true;
@@ -254,58 +253,67 @@ export default function AuthCallback() {
         }
 
         console.log('[auth/callback] Exchanging code for session...');
+        console.log('[auth/callback] Code length:', code.length);
         
-        // For PKCE to work, we need to use the same Supabase client instance
-        // that initiated the OAuth flow. The code verifier is stored in the client's storage.
-        // If we're here, it means Supabase didn't auto-handle it, so we need to exchange manually.
-        // However, if the code verifier is missing, it means we're using a different client instance.
-        // Let's try the exchange - Supabase should have the verifier stored.
+        // CRITICAL FIX: Wait a moment to ensure storage is ready
+        // Sometimes the code verifier hasn't been fully persisted when we try to exchange
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Try to exchange the code - Supabase should automatically retrieve the code verifier
+        // The code verifier is stored when signInWithOAuth is called with the same redirect URL
         const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
 
         if (sessionError) {
           // Log the error for debugging
           if (__DEV__) {
-            console.log('[auth/callback] Code exchange error:', sessionError);
+            console.error('[auth/callback] Code exchange error:', sessionError);
+            console.error('[auth/callback] Error message:', sessionError.message);
+            console.error('[auth/callback] Error code:', sessionError.status);
           }
           
-          // If PKCE error, it means the code verifier is missing
-          // This can happen if the client instance changed. Let's try to get session again
-          // after a brief delay (Supabase might be processing it in the background)
-          if (sessionError.message?.includes('code verifier') || sessionError.message?.includes('PKCE')) {
-            console.log('[auth/callback] PKCE error detected, waiting for Supabase to auto-handle...');
+          // If PKCE error, the code verifier is missing from storage
+          // This usually means the redirect URL doesn't match or storage failed
+          if (sessionError.message?.includes('code verifier') || 
+              sessionError.message?.includes('PKCE') ||
+              sessionError.message?.includes('code_verifier') ||
+              sessionError.message?.includes('both auth code and code verifier')) {
+            console.error('[auth/callback] PKCE error: Code verifier not found');
+            console.error('[auth/callback] This usually means:');
+            console.error('[auth/callback] 1. The redirect URL in signInWithOAuth doesn\'t match the callback URL');
+            console.error('[auth/callback] 2. The storage adapter failed to persist the code verifier');
+            console.error('[auth/callback] 3. The code verifier was cleared before the callback');
+            
+            // Try one more time after a longer delay (storage might need more time)
+            console.log('[auth/callback] Retrying after delay...');
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            const { data: retrySession } = await supabase.auth.getSession();
-            if (retrySession.session) {
-              console.log('[auth/callback] Session found after retry, redirecting...');
+            const { data: retryData, error: retryError } = await supabase.auth.exchangeCodeForSession(code);
+            if (retryError) {
+              console.error('[auth/callback] Retry also failed:', retryError);
+              hasProcessedRef.current = true;
+              router.replace('/(auth)/sign-in?error=' + encodeURIComponent('Authentication failed. Please close the app completely and try signing in again.'));
+              return;
+            }
+            
+            // Retry succeeded
+            if (retryData?.session) {
+              console.log('[auth/callback] Session created on retry!');
               hasProcessedRef.current = true;
               router.replace('/(tabs)/dashboard');
               return;
             }
           }
           
+          // For other errors, show a generic message
           hasProcessedRef.current = true;
           router.replace('/(auth)/sign-in?error=' + encodeURIComponent('Authentication failed. Please try signing in again.'));
           return;
         }
 
-        if (data.session) {
-          console.log('[auth/callback] Session created successfully! Waiting for persistence...');
-          
-          // Wait a moment to ensure session is persisted to storage
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Verify session is still set
-          const { data: verifyData } = await supabase.auth.getSession();
-          if (verifyData.session) {
-            console.log('[auth/callback] Session verified, redirecting to dashboard...');
-            hasProcessedRef.current = true;
-            router.replace('/(tabs)/dashboard');
-          } else {
-            console.error('[auth/callback] Session not persisted');
-            hasProcessedRef.current = true;
-            router.replace('/(auth)/sign-in?error=session_not_persisted');
-          }
+        if (data?.session) {
+          console.log('[auth/callback] Session created successfully!');
+          hasProcessedRef.current = true;
+          router.replace('/(tabs)/dashboard');
         } else {
           console.error('[auth/callback] No session in response');
           hasProcessedRef.current = true;

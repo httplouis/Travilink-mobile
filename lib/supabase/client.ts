@@ -26,15 +26,30 @@ const storageAdapter = {
         // Try SecureStore first, then AsyncStorage (for large values)
         try {
           const value = await SecureStore.getItemAsync(key);
-          if (value) return value;
+          if (value) {
+            // Debug: Log when code verifier is retrieved (but don't log the value for security)
+            if (__DEV__ && key.includes('code-verifier')) {
+              console.log(`[Supabase Storage] Retrieved code verifier from SecureStore for key: ${key}`);
+            }
+            return value;
+          }
         } catch (secureStoreError) {
           // SecureStore might not have the value (or it's too large), try AsyncStorage
+          if (__DEV__ && key.includes('code-verifier')) {
+            console.log(`[Supabase Storage] SecureStore failed for code verifier, trying AsyncStorage...`);
+          }
         }
         // Fallback to AsyncStorage (for large values stored there)
-        return await AsyncStorage.getItem(key);
+        const asyncValue = await AsyncStorage.getItem(key);
+        if (asyncValue && __DEV__ && key.includes('code-verifier')) {
+          console.log(`[Supabase Storage] Retrieved code verifier from AsyncStorage for key: ${key}`);
+        }
+        return asyncValue;
       }
     } catch (error) {
-      console.error('Error getting item from storage:', error);
+      if (__DEV__) {
+        console.error(`[Supabase Storage] Error getting item "${key}" from storage:`, error);
+      }
       return null;
     }
   },
@@ -50,21 +65,34 @@ const storageAdapter = {
         // For smaller values, try SecureStore first, fallback to AsyncStorage
         if (value.length > 2048) {
           // Use AsyncStorage for large values (no size limit)
-          console.log(`[Supabase Storage] Using AsyncStorage for large value (${value.length} bytes) for key "${key}"`);
+          if (__DEV__) {
+            console.log(`[Supabase Storage] Using AsyncStorage for large value (${value.length} bytes) for key "${key}"`);
+          }
           await AsyncStorage.setItem(key, value);
         } else {
           // Try SecureStore for smaller values (more secure)
+          // IMPORTANT: Code verifier must be stored securely and persist across app state changes
           try {
             await SecureStore.setItemAsync(key, value);
+            if (__DEV__ && key.includes('code-verifier')) {
+              console.log(`[Supabase Storage] Stored code verifier in SecureStore for key: ${key}`);
+            }
           } catch (secureStoreError: any) {
             // Fallback to AsyncStorage if SecureStore fails
-            console.warn(`[Supabase Storage] SecureStore failed for key "${key}", using AsyncStorage:`, secureStoreError.message);
+            if (__DEV__) {
+              console.warn(`[Supabase Storage] SecureStore failed for key "${key}", using AsyncStorage:`, secureStoreError.message);
+            }
             await AsyncStorage.setItem(key, value);
+            if (__DEV__ && key.includes('code-verifier')) {
+              console.log(`[Supabase Storage] Stored code verifier in AsyncStorage for key: ${key}`);
+            }
           }
         }
       }
     } catch (error) {
-      console.error('Error setting item in storage:', error);
+      if (__DEV__) {
+        console.error(`[Supabase Storage] Error setting item "${key}" in storage:`, error);
+      }
     }
   },
   removeItem: async (key: string) => {

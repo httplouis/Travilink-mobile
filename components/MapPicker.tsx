@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Conditionally import react-native-maps only on native platforms
+// Conditionally import expo-maps only on native platforms
 // IMPORTANT: Even if require succeeds, the native module may not be available in Expo Go
 // So we'll check at runtime if MapView actually works
 let MapView: any = null;
@@ -24,7 +24,7 @@ let MapViewAvailable = false; // Track if MapView is actually usable
 
 if (Platform.OS !== 'web') {
   try {
-    const Maps = require('react-native-maps');
+    const Maps = require('expo-maps');
     // Check if the module exists, but don't assume it works
     // We'll test it at runtime
     if (Maps && Maps.default) {
@@ -34,7 +34,7 @@ if (Platform.OS !== 'web') {
       // Don't set MapViewAvailable = true here - we'll check at runtime
     }
   } catch (error) {
-    console.warn('[MapPicker] react-native-maps module not found:', error);
+    console.warn('[MapPicker] expo-maps module not found:', error);
     MapViewAvailable = false;
   }
 }
@@ -461,7 +461,7 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
           </View>
         )}
 
-        {/* Map - Always show map container, use WebView Leaflet.js if react-native-maps not available */}
+        {/* Map - Always show map container, use WebView Leaflet.js if expo-maps not available */}
         <View style={styles.mapContainer}>
           {Platform.OS !== 'web' && MapView && mapViewActuallyWorks ? (
             <>
@@ -506,7 +506,7 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
                 {/* OpenStreetMap tiles - completely free, no API key needed for both iOS and Android */}
                 {(() => {
                   try {
-                    const UrlTile = require('react-native-maps').UrlTile;
+                    const UrlTile = require('expo-maps').UrlTile;
                     return (
                       <UrlTile
                         urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -550,7 +550,7 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
                     <Ionicons name="warning-outline" size={24} color="#f59e0b" />
                     <Text style={styles.mapErrorText}>{mapError}</Text>
                     <Text style={styles.mapErrorSubtext}>
-                      You can still search for locations above. The map will work once react-native-maps is properly configured.
+                      You can still search for locations above. The map will work once expo-maps is properly configured.
                     </Text>
                   </View>
                 </View>
