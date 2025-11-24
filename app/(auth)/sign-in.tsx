@@ -153,21 +153,11 @@ export default function SignInScreen() {
                 return;
               }
 
-              // If we have access_token, pass it directly
-              if (accessToken) {
-                console.log('[sign-in] Access token found, navigating to callback route...');
-                router.push(`/auth/callback?url=${encodeURIComponent(result.url)}`);
-                setLoading(false);
-              } else if (code) {
-                console.log('[sign-in] Code found, navigating to callback route...');
-                router.push(`/auth/callback?code=${encodeURIComponent(code)}`);
-                setLoading(false);
-              } else {
-                // Pass the full URL and let callback route handle parsing
-                console.log('[sign-in] No code or token in URL, passing full URL to callback...');
-                router.push(`/auth/callback?url=${encodeURIComponent(result.url)}`);
-                setLoading(false);
-              }
+              // Always pass the full callback URL to ensure Supabase can match it with the stored code verifier
+              // The redirect URL must match exactly what we passed to signInWithOAuth
+              console.log('[sign-in] Passing callback URL to route...');
+              router.push(`/auth/callback?url=${encodeURIComponent(result.url)}`);
+              setLoading(false);
             } else if (result.type === 'cancel') {
               console.log('[sign-in] User cancelled OAuth');
               setLoading(false);

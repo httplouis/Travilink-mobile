@@ -38,18 +38,49 @@ export default function AuthCallback() {
         }
         
         // Parse URL parameter (from sign-in redirect)
+        // This is the full callback URL from the OAuth provider
         const urlParam = params.url as string;
         if (urlParam) {
           try {
-            const hashMatch = urlParam.match(/#(.+)/);
-            if (hashMatch && hashMatch[1]) {
-              hashParams = new URLSearchParams(hashMatch[1]);
+            // Try to parse as a full URL first
+            const callbackUrl = new URL(urlParam);
+            
+            // Extract from hash fragment (OAuth tokens usually in hash)
+            const hash = callbackUrl.hash.substring(1); // Remove leading #
+            if (hash) {
+              hashParams = new URLSearchParams(hash);
               if (!accessToken) accessToken = hashParams.get('access_token');
               if (!code) code = hashParams.get('code');
               if (!error) error = hashParams.get('error');
             }
+            
+            // Also check query params (some OAuth flows use query params)
+            if (!code) code = callbackUrl.searchParams.get('code');
+            if (!error) error = callbackUrl.searchParams.get('error');
+            
+            // Fallback: try regex match for hash
+            if (!hashParams) {
+              const hashMatch = urlParam.match(/#(.+)/);
+              if (hashMatch && hashMatch[1]) {
+                hashParams = new URLSearchParams(hashMatch[1]);
+                if (!accessToken) accessToken = hashParams.get('access_token');
+                if (!code) code = hashParams.get('code');
+                if (!error) error = hashParams.get('error');
+              }
+            }
           } catch (e) {
-            // Ignore parsing errors
+            // If URL parsing fails, try regex match
+            try {
+              const hashMatch = urlParam.match(/#(.+)/);
+              if (hashMatch && hashMatch[1]) {
+                hashParams = new URLSearchParams(hashMatch[1]);
+                if (!accessToken) accessToken = hashParams.get('access_token');
+                if (!code) code = hashParams.get('code');
+                if (!error) error = hashParams.get('error');
+              }
+            } catch (regexError) {
+              // Ignore parsing errors
+            }
           }
         }
         
@@ -203,7 +234,18 @@ export default function AuthCallback() {
           return;
         }
 
-        // Native flow: exchange code for session
+        // Native flow: Check if Supabase already has a session (it might have auto-handled the OAuth)
+        // Supabase stores the PKCE code verifier and can automatically exchange the code
+        const { data: existingSession } = await supabase.auth.getSession();
+        if (existingSession.session) {
+          console.log('[auth/callback] Session already exists, redirecting...');
+          hasProcessedRef.current = true;
+          router.replace('/(tabs)/dashboard');
+          return;
+        }
+
+        // If no session exists and we have a code, try to exchange it
+        // But first, let's check if the URL contains the full callback URL that Supabase expects
         if (!code) {
           console.error('[auth/callback] No code or access_token provided');
           hasProcessedRef.current = true;
@@ -213,12 +255,37 @@ export default function AuthCallback() {
 
         console.log('[auth/callback] Exchanging code for session...');
         
+        // For PKCE to work, we need to use the same Supabase client instance
+        // that initiated the OAuth flow. The code verifier is stored in the client's storage.
+        // If we're here, it means Supabase didn't auto-handle it, so we need to exchange manually.
+        // However, if the code verifier is missing, it means we're using a different client instance.
+        // Let's try the exchange - Supabase should have the verifier stored.
         const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
 
         if (sessionError) {
-          console.error('[auth/callback] Session error:', sessionError);
+          // Log the error for debugging
+          if (__DEV__) {
+            console.log('[auth/callback] Code exchange error:', sessionError);
+          }
+          
+          // If PKCE error, it means the code verifier is missing
+          // This can happen if the client instance changed. Let's try to get session again
+          // after a brief delay (Supabase might be processing it in the background)
+          if (sessionError.message?.includes('code verifier') || sessionError.message?.includes('PKCE')) {
+            console.log('[auth/callback] PKCE error detected, waiting for Supabase to auto-handle...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const { data: retrySession } = await supabase.auth.getSession();
+            if (retrySession.session) {
+              console.log('[auth/callback] Session found after retry, redirecting...');
+              hasProcessedRef.current = true;
+              router.replace('/(tabs)/dashboard');
+              return;
+            }
+          }
+          
           hasProcessedRef.current = true;
-          router.replace('/(auth)/sign-in?error=' + encodeURIComponent(sessionError.message));
+          router.replace('/(auth)/sign-in?error=' + encodeURIComponent('Authentication failed. Please try signing in again.'));
           return;
         }
 
@@ -226,10 +293,9 @@ export default function AuthCallback() {
           console.log('[auth/callback] Session created successfully! Waiting for persistence...');
           
           // Wait a moment to ensure session is persisted to storage
-          // This allows AuthContext to pick up the session change
           await new Promise(resolve => setTimeout(resolve, 500));
           
-          // Verify session is still set (in case of race conditions)
+          // Verify session is still set
           const { data: verifyData } = await supabase.auth.getSession();
           if (verifyData.session) {
             console.log('[auth/callback] Session verified, redirecting to dashboard...');
