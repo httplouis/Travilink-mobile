@@ -16,6 +16,7 @@ export function useComptrollerInbox(comptrollerId: string) {
 
       try {
         // Fetch requests with status = pending_comptroller where comptroller_approved_at IS NULL
+        // Also check comptroller_rejected_at to ensure we only get truly pending requests
         const { data: requests, error: requestsError } = await supabase
           .from('requests')
           .select(`
@@ -24,6 +25,7 @@ export function useComptrollerInbox(comptrollerId: string) {
           `)
           .eq('status', 'pending_comptroller')
           .is('comptroller_approved_at', null)
+          .is('comptroller_rejected_at', null)
           .order('created_at', { ascending: false })
           .limit(50)
           .abortSignal(abortController.signal);
@@ -35,7 +37,15 @@ export function useComptrollerInbox(comptrollerId: string) {
           if (requestsError.message?.includes('Aborted') || requestsError.message?.includes('abort')) {
             return [];
           }
-          throw requestsError;
+          // Only log error if there's meaningful error info
+          if (requestsError.code || requestsError.message) {
+            console.error('[useComptrollerInbox] Error fetching requests:', {
+              code: requestsError.code,
+              message: requestsError.message,
+            });
+          }
+          // Return empty array instead of throwing to prevent UI crashes
+          return [];
         }
 
         return (requests || []) as Request[];

@@ -14,6 +14,14 @@ interface ApproveBudgetParams {
   signature: string;
   comments?: string;
   editedBudget?: Record<string, number | null>;
+  nextApproverId?: string | null;
+  nextApproverRole?: string;
+}
+
+interface ReturnToSenderParams {
+  requestId: string;
+  reason: string;
+  signature?: string;
 }
 
 export function useComptrollerBudgetReview() {
@@ -57,11 +65,11 @@ export function useComptrollerBudgetReview() {
       // Calculate new expense breakdown with edits
       const expenseBreakdown = currentRequest.expense_breakdown || [];
       const updatedBreakdown = expenseBreakdown.map((item: any) => {
-        const category = item.category?.toLowerCase() || '';
-        if (editedBudget[category] !== undefined) {
+        const itemKey = item.item?.toLowerCase() || '';
+        if (editedBudget[itemKey] !== undefined) {
           return {
             ...item,
-            amount: editedBudget[category] || 0,
+            amount: editedBudget[itemKey] || 0,
           };
         }
         return item;
@@ -132,11 +140,11 @@ export function useComptrollerBudgetReview() {
         if (currentRequest) {
           const expenseBreakdown = currentRequest.expense_breakdown || [];
           const updatedBreakdown = expenseBreakdown.map((item: any) => {
-            const category = item.category?.toLowerCase() || '';
-            if (editedBudget[category] !== undefined) {
+            const itemKey = item.item?.toLowerCase() || '';
+            if (editedBudget[itemKey] !== undefined) {
               return {
                 ...item,
-                amount: editedBudget[category] || 0,
+                amount: editedBudget[itemKey] || 0,
               };
             }
             return item;
@@ -155,22 +163,36 @@ export function useComptrollerBudgetReview() {
       }
 
       // Approve budget and move to next stage
+      const updateData: any = {
+        comptroller_approved_at: now,
+        comptroller_approved_by: profile.id,
+        comptroller_comments: comments || null,
+        comptroller_signature: signature,
+        comptroller_signed_at: new Date().toISOString(),
+        status: 'pending_hr', // Move to HR stage by default
+      };
+
+      // Add next approver info if provided
+      if (nextApproverId) {
+        updateData.next_approver_id = nextApproverId;
+      }
+      if (nextApproverRole) {
+        updateData.next_approver_role = nextApproverRole;
+      }
+
       const { error: updateError } = await supabase
         .from('requests')
-        .update({
-          comptroller_approved_at: now,
-          comptroller_approved_by: profile.id,
-          comptroller_comments: comments || null,
-          status: 'pending_hr', // Move to HR stage
-        })
+        .update(updateData)
         .eq('id', requestId);
 
       if (updateError) throw updateError;
 
       // Invalidate queries to refresh
-      queryClient.invalidateQueries({ queryKey: ['comptroller-inbox'] });
-      queryClient.invalidateQueries({ queryKey: ['hr-inbox'] });
-      queryClient.invalidateQueries({ queryKey: ['request-tracking'] });
+      await queryClient.invalidateQueries({ queryKey: ['comptroller-inbox'] });
+      await queryClient.invalidateQueries({ queryKey: ['hr-inbox'] });
+      await queryClient.invalidateQueries({ queryKey: ['request-tracking'] });
+      // Force refetch HR inbox immediately
+      await queryClient.refetchQueries({ queryKey: ['hr-inbox'] });
 
       return { success: true };
     } catch (err: any) {
@@ -183,9 +205,68 @@ export function useComptrollerBudgetReview() {
     }
   };
 
+  const returnToSender = async ({ requestId, reason, signature }: ReturnToSenderParams) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get user profile
+      const { data: profile } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (!profile) {
+        throw new Error('User profile not found');
+      }
+
+      const now = new Date().toISOString();
+
+      // Return to sender (set back to draft so requester can edit and resubmit)
+      const { error: updateError } = await supabase
+        .from('requests')
+        .update({
+          status: 'draft',
+          comptroller_rejected_at: now,
+          comptroller_rejected_by: profile.id,
+          comptroller_rejection_reason: reason,
+          comptroller_comments: reason,
+          comptroller_signature: signature || null,
+          comptroller_signed_at: signature ? new Date().toISOString() : null,
+          returned_to_requester_at: now,
+          returned_by: profile.id,
+          return_reason: reason,
+        })
+        .eq('id', requestId);
+
+      if (updateError) throw updateError;
+
+      // Invalidate queries to refresh
+      queryClient.invalidateQueries({ queryKey: ['comptroller-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['request-tracking'] });
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error rejecting budget:', err);
+      setError(err.message || 'Failed to reject budget');
+      Alert.alert('Error', err.message || 'Failed to reject budget');
+      return { success: false, error: err.message };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return {
     updateBudget,
     approveBudget,
+    returnToSender,
     isSubmitting,
     error,
   };

@@ -204,13 +204,6 @@ export default function ProfileScreen() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push('/profile/settings')}
-        >
-          <Ionicons name="settings-outline" size={20} color="#7a0019" />
-          <Text style={styles.actionButtonText}>Settings</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={[styles.actionButton, styles.actionButtonDanger]} onPress={handleSignOut}>
           <Ionicons name="log-out" size={20} color="#dc2626" />
           <Text style={styles.actionButtonTextDanger}>Sign Out</Text>

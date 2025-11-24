@@ -71,6 +71,22 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Signature Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Signature</Text>
+        
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => router.push('/profile/settings/signature')}
+        >
+          <View style={styles.settingLeft}>
+            <Ionicons name="create-outline" size={20} color="#6b7280" />
+            <Text style={styles.settingLabel}>Automatic Signature</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+        </TouchableOpacity>
+      </View>
+
       {/* Notifications Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Notifications</Text>

@@ -1,0 +1,145 @@
+GROUPMATE'S PROMPTS
+dapat may notifs pag like maraming pending na? like may alert something.
+
+pwede maghabol ng travel order if for instance, si head at si head ay same ng pupuntahan pero si head ang unang nagpasa tapos inihabol lang si isa pang head, ang problem is diba sa system natin ay di na available si driver if naapprove na sya at may trip na, pero kung ihahabol si isa pang head edi pede yon diba? like si admin pede nya paring iassign si driver at vehicle sa requester's travel gets ba?parang dalwang travel order tas isang vehicle
+pwede baguhin assigned driver and vehicle
+
+date ng travel
+pupuntahan
+passenger
+gagamiting sasakyan
+
+pagtext sa driver pag nnaapprove na yung request automatic magsesend kay driver yung details nung request pero minimal, like basic info, something like name nung passenger at number info at date info at location info. 
+
+
+may marereceive na pending evaluation notifs to na magaalert sa kanila na uy di mo pa ineevaluate last trip mo(requeester)
+may reminder na requesting after mag travel eto yung sa feedback din
+
+kailangan maging user friendly pa yung forms? or yung system. tapos parang masyadong maraming ififill sa forms? anong way para malessen yung pag iinput sa travel order form at seminar. 
+
+sa travel cost naman, sabi ay fix na cost dun sa like mga food at drivers allowance pero kahit wala naman munang fix na price kumbaga para may mapakita lang pero optional pa rin, kumabaga may fix pero pede mo rin iedit diba?
+ganon
+
+magppsa bago or additional attachments(pag nareject yung request ni requester pede, automatic marereturn sa requester, if may policy na di nasunod pero sa part na to ng approver) ang mangyayari is kung gagawa ba sila ng bagong request or may iaattach na lang ulit additional sa request travel at ipapasa ulit kung san
+
+
+more than 15k yung threshold sa budget proposal para mapapunta sa president KUNG ikaw ay faculty lang na nagrerequest. 
+duplicate trabel orders
+save as pdf regardless kung nasan pa lang yung travel order or seminar
+
+
+pag sa sarili automatic nagyayari lng kay doc approving sa form kay vp admin nalang
+
+filing name sa pdf TO-2025-TravelNumber-PangalanNungNagEequest
+(pwede initials) Ms. Sylvia?, C. O Ortiz, etc. 
+pangalan lang nung nagrequest
+ 
+
+
+yung vp may option na mag approve ng document
+
+may travels na di nadaan kah COO/President
+
+case scenarios:
+si faculty mag totop resource sepaler di aabot kay president/coo?
+pag mag iinspection sa candeleria pag di kasama head, hanggang kay vp admin
+basta automatic dept head admin or dean, napunta kay coo/president
+
+Age bracket need empathy(hci principles for age like late 50s) dapat usable
+
+pano pag di kilala yung sesendan(if matanda yung requester) kaya dapat may help and smart talaga yung system  
+
+smart feature sa pagsesend ng approve request from requester(like kunwari si head requester pag sinend nya tapos sa option modal send dapat nasa taas na agad at suggested kung kanino isesend, diba smart)
+
+
+make it easier kasi mas madali magsulat sa pdf? so dapat mapapadali talaga ang pagrerequest para may points kami sa defense na masabi na need talaga toh at may potential
+kung pano magiging convenient sa age bracket
+
+
+Transportation Coordinator TM di maganda admin yung name, dapat Transportation Coordinator yung name nung admin na nagmamanage ng transpo si maam Trizzia Marie 
+
+
+
+
+president view comptroller walng perma, first vp mali oras
+
+yung budget edit breakdown sa comptroller, pag niremove lahat ng nnumbers, nagkakaroon ng zero and hindi syya nadedelete agad? lets say dinelete ko 700, niremove ko lahat tas nagkakaroon ng 0 and pag nnagtype ako ulit nagiging 0700. 
+need multiple yung pagsesendan
+tapos pano yung mangyayari na pag nireturn sa sender, dapat pag binalik maeedit? 
+and pano pag yung nangyaring from head tapos since optional na isend kay admin at comptroller kasi pano pag walang namang budget at vehicle. edi pede na nya isend kay hr agad para mabilis, so anong makikita ni requester? edi dapat pag walang budget and vehicle, makikita ni requester sa tracking or basta may makikita syang skipped na yung admin at comptroller something like that. 
+
+dapat lahat ng pages lalo na inbox from head user, admin, comptroller, hr, vp and pres, dapat auto refresh na yungn page para realtime hindi ko na kailangan ireload pa yung buong page para makita, fix that. 
+
+yung about sa pano pag dalawang magkaiba yung department kunwari 
+ccms at hr department heads ang lalabas, magkaiba sila ng vp heads, isang vp academics and vp administration. so pede isend ng kung sino man ang magseesend sa vp pede dalawa multiple send and separate sila ng pirma, gets naman diba? kunwari isesend ni hr sa vp so pedeng multiple or isusuggest na ni system na, dalawa yung magkaibang department so need dalawa yung ituturo nyang vp na magpipirma pero, optional lang naman na dalawa, kahit isa lang yung pumirmang vp okay na, so siguro masesend pa rin dun sa dalawang vp? pero pedeng maapprove sya at masend kay pres(which is yung current na nasa system, naaaprove and complete yunng request kahit di pumirma yung isang vp) gets?
+
+and pano namin malalaman na completed na yung trip, di namin matest. kaya dapat time sensitive diba? pag natapos yung mga nasa calendar or yung mismong trip nni requester, dapat automatic na macocomplete yon sa admin? 
+
+yung sa part ni requester details submissionn, may mga kulang kulang na details don, including yung history nung binagong budget ni comptroller, hindi naiiba. and dun sa section part ng mga pumirma, Approval Signatures, ang nakalagay lang Administrator
+Approved
+A
+Administrator
+
+Administrative Officer, Administration
+dapat may name nung pumirma diba? and mali pa rin yung time na balik nung sa vp and president pafix ng part na yon. 
+tingnan mo M
+HR Manager
+
+HR Manager, Human Resources
+
+Approved on November 22, 2025 at 3:17 AM
+Vice President
+Approved
+VP
+Vice President
+
+Vice President for Academic Affairs, Executive
+
+Approved on November 21, 2025 at 7:18 PM
+University President
+Approved
+UP
+University President
+
+University President, Executive
+
+Approved on November 21, 2025 at 7:18 PM
+
+Digital Signature:
+
+diba mali?
+
+di realtime yung inbox page sa vp at pres? make it realtime
+pag napindot return to sender walang way para bumalik sa mga listahan kanina (presis and such)
+
+and yung abt sa calendar page, bakit di nakikita ng ibang user, lets say si user/head/faulty from CAS ay nagcheck sa schedule page, dapat nakikita nya na may taken na slot that day diba? pero hindi nya makikita yungn details ng trip,makikita nya lang na like 1/5 slot and like 1 pending or 1 pending and 2 approved. somethingg like that, for privacy. 
+
+yung sa forms Request Configuration section, imbis na like visit, seminar, CES, business, etc. ang gawin mo na lang is 
+travel order or seminar application, then same option sa vehicle and tanggalin mo na siguro yung sa head or faculty? kasi nadedetect naman diba kung ano yung account mo? or pano kung pinahabilin no, pede rin pala, kunwari faculty ako, tas ang requester ay head, pero account ni faculty so, dapat pala pag may head na talaga sa requesting person area/sectiom, nadedetect na talaga na may sa requester so no need na ng pirma ng dept head endorsement noh? 
+
+
+ang gawin mo dito sa pag print ng pdf 
+dba sa requesting person dalawa, ang limit lang dun sa box is siguro dalawa? pero pano pag sumobra sa dalawa? or lets say ang limit is 6 pagkasyahin mo na lang, like kunwari pag dalawa, edi nasa taas at baba
+parang ganto
+BELSON GABRIEL TAN  [sign]
+JOSE LOUIS ROSALES   [sign]
+
+pag nagdoble name, isa lang lagay mo, tapos sa department naman, acronym na lang ilagay mo, like CCMS ganon, so pag dalawang department edi, gnato
+CCMS 
+HRD 
+
+yung indorsed naman head, lagyan mo ng date and time yung tabi ng pirma, apply mo rin sa lahat ng pirma yan, actually if merong comments si approver, lagay mo rin
+
+[sign] date and time 
+         comments  
+
+something like that 
+
+
+tapos pag sumobra naman sa anim yung requester so di na kasya, ilagay mo sa isa pang page basta kahit blank na nakatable with their pirma. so pag dinownload ay 2 pages(kung maraming requesting person)
+
+etong view ni hr, gawin mong katulad kay comptroller @ComptrollerReviewModal.tsx , pero syempre dapat visible yung mga previous pumirma and yung pag aapprove same concept lang din, go para standardized and ganon na rin gawin mo kay vp at president. go prompt
+Jolo
+dito na magkakaroon ng changes from hr to vps, kasi dapat magkakaiba sila and dapat pede kong isend to multiple vps kasi depende sa department yung head. kunwari
+department ni ccms(under sya ni svp academics) and hr department which under sya ni vp admin so dalawa ang pipirma pero,
+okay lang naman yung part na kahit isa lang yung present na pumirma so kung nareceive na ni svp tapos napirmahan na ni svp tapos nasend na nya kay president(if syempre heads yung requester pero kung faculty hanggang sa vps lang) edi pipirmahan na ni president kahit isa lang yung present na pirma, so kung naapprove na ni president kumabaga napirmahan ni vp admin after edi parang mahahabol na lang yung pirma, like aappear na lang siguro rin sa tracker. tama ba? go gawin mo yan.

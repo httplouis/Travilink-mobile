@@ -10,14 +10,36 @@ import {
   Platform,
   Animated,
   Image,
+  Alert,
 } from 'react-native';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Optional haptics import
+let Haptics: any = null;
+try {
+  Haptics = require('expo-haptics');
+} catch (e) {
+  // Haptics not available, continue without it
+}
 import { useDashboard } from '@/hooks/useDashboard';
+import { useHeadInbox } from '@/hooks/useHeadInbox';
+import { useHRInbox } from '@/hooks/useHRInbox';
+import { useVPInbox } from '@/hooks/useVPInbox';
+import { usePresidentInbox } from '@/hooks/usePresidentInbox';
+import { usePendingEvaluations } from '@/hooks/usePendingEvaluations';
+import { useComptrollerStats } from '@/hooks/useComptrollerStats';
+import { useComptrollerInbox } from '@/hooks/useComptrollerInbox';
+import { useVPStats } from '@/hooks/useVPStats';
+import { useHRStats } from '@/hooks/useHRStats';
+import { usePresidentStats } from '@/hooks/usePresidentStats';
+import { useAutoCompleteTrips } from '@/hooks/useAutoCompleteTrips';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { formatDate, formatTime } from '@/lib/utils';
+import { formatDate, formatTime, isComptroller } from '@/lib/utils';
 import SidebarMenu from '@/components/SidebarMenu';
 import NavigationHeader from '@/components/NavigationHeader';
+import CalendarWidget from '@/components/CalendarWidget';
 
 export default function DashboardScreen() {
   const { profile, loading: authLoading } = useAuth();
@@ -27,6 +49,54 @@ export default function DashboardScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+
+  // Role-based inbox hooks (only enabled if user has that role)
+  const headInbox = useHeadInbox(profile?.id || '', profile?.department_id || null);
+  const hrInbox = useHRInbox(profile?.is_hr ? profile.id : '');
+  const vpInbox = useVPInbox(profile?.is_vp ? profile.id : '');
+  const presidentInbox = usePresidentInbox(profile?.is_president ? profile.id : '');
+  const pendingEvaluations = usePendingEvaluations(profile?.id || '');
+
+  // Role-based stats hooks
+  const isComptrollerUser = isComptroller(profile?.email || '');
+  const comptrollerInbox = useComptrollerInbox(isComptrollerUser ? profile?.id || '' : '');
+  const comptrollerStats = useComptrollerStats();
+  const vpStats = useVPStats();
+  const hrStats = useHRStats();
+  const presidentStats = usePresidentStats();
+
+  // Auto-complete trips in background
+  useAutoCompleteTrips();
+
+  // Determine pending approvals count based on role
+  const pendingApprovalsCount = isComptrollerUser
+    ? comptrollerInbox.requests.length
+    : profile?.is_head
+    ? headInbox.requests.length
+    : profile?.is_hr
+    ? hrInbox.requests.length
+    : profile?.is_vp
+    ? vpInbox.requests.length
+    : profile?.is_president
+    ? presidentInbox.requests.length
+    : 0;
+
+  // Show alert if many pending requests (>5)
+  const showPendingAlert = pendingApprovalsCount > 5;
+  
+  // Pending evaluations count
+  const pendingEvaluationsCount = pendingEvaluations.pendingTrips?.length || 0;
+  const showEvaluationAlert = pendingEvaluationsCount > 0;
+
+  // Get trips starting soon (within 3 days)
+  const tripsStartingSoon = trips.filter((trip) => {
+    if (!trip.travel_start_date) return false;
+    const startDate = new Date(trip.travel_start_date);
+    const today = new Date();
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(today.getDate() + 3);
+    return startDate >= today && startDate <= threeDaysFromNow;
+  });
 
   // All hooks must be called BEFORE any early returns
   useEffect(() => {
@@ -61,7 +131,7 @@ export default function DashboardScreen() {
   if (authLoading || !profile) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#7a0019" />
+        <ActivityIndicator size="large" color="#7A0010" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -70,8 +140,33 @@ export default function DashboardScreen() {
   const day = currentTime.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const time = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // Swipe gesture handler - only swipe right to go to Inbox (no left swipe)
+  const onGestureEvent = (event: any) => {
+    const { translationX } = event.nativeEvent;
+    // Only allow swipe right (positive translationX)
+    if (translationX > 50) {
+      if (Haptics) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      router.push('/(tabs)/inbox');
+    }
+  };
+
+  const onHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      // Only allow swipe right (positive translationX or velocityX)
+      if (translationX > 50 || (velocityX > 500 && translationX > 0)) {
+        if (Haptics) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        router.push('/(tabs)/inbox');
+      }
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       {/* Header with Menu and Notifications */}
       <NavigationHeader
         title="Dashboard"
@@ -80,13 +175,25 @@ export default function DashboardScreen() {
         showMenu={true}
       />
 
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7a0019" />
-        }
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+        activeOffsetX={10}
+        failOffsetX={[-10, 10]} // Block left swipe: first negative, second positive
+        failOffsetY={[-5, 5]}
       >
-      {/* Hero Section */}
+        <ScrollView
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh} 
+            tintColor="#7A0010"
+            colors={['#7A0010']}
+            />
+          }
+        >
+      {/* Enhanced Hero Section */}
       <Animated.View
         style={[
           styles.hero,
@@ -97,140 +204,364 @@ export default function DashboardScreen() {
         ]}
       >
         <View style={styles.heroContent}>
-          <Text style={styles.heroGreeting}>Welcome to TraviLink 👋</Text>
+          <Text style={styles.heroGreeting}>Welcome back,</Text>
           <Text style={styles.heroName}>{profile.name || 'User'}</Text>
-          <View style={styles.heroTimeContainer}>
-            <Ionicons name="calendar-outline" size={14} color="#fff" />
-            <Text style={styles.heroTime}>{day}</Text>
-            <Text style={styles.heroTimeSeparator}>•</Text>
-            <Ionicons name="time-outline" size={14} color="#fff" />
-            <Text style={styles.heroTime}>{time}</Text>
+          <View style={styles.heroStats}>
+            <View style={styles.heroStatItem}>
+              <Ionicons name="document-text-outline" size={16} color="#fff" />
+              <Text style={styles.heroStatText}>{kpis.activeRequests} Active</Text>
+            </View>
+            <View style={styles.heroStatItem}>
+              <Ionicons name={isComptrollerUser ? "calculator-outline" : "time-outline"} size={16} color="#fff" />
+              <Text style={styles.heroStatText}>
+                {isComptrollerUser 
+                  ? `${pendingApprovalsCount} Budget Review${pendingApprovalsCount !== 1 ? 's' : ''}`
+                  : `${pendingApprovalsCount} Pending`}
+              </Text>
+            </View>
           </View>
         </View>
       </Animated.View>
 
-      {/* KPI Cards */}
-      <View style={styles.kpiRow}>
-        <KPICard
-          icon="document-text-outline"
-          label="Active Requests"
-          value={kpis.activeRequests}
-          color="#2563eb"
-        />
-        <KPICard
-          icon="car-outline"
-          label="Vehicles Online"
-          value={kpis.vehiclesOnline}
-          color="#16a34a"
-        />
-        <KPICard
-          icon="time-outline"
-          label="Pending Approvals"
-          value={kpis.pendingApprovals}
-          color="#f59e0b"
-        />
-      </View>
-
-      {/* Quick Actions */}
-      <Animated.View
-        style={[
-          styles.section,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <Text style={styles.sectionSubtitle}>Fast shortcuts</Text>
-        </View>
-        <View style={styles.quickActionsGrid}>
-          <QuickActionButton
-            icon="person-circle-outline"
-            label="Edit Profile"
-            color="#7a0019"
-            onPress={() => router.push('/profile')}
-          />
-          <QuickActionButton
+      {/* KPI Cards - Role-based (Hide for head users) */}
+      {profile?.is_head ? null : isComptrollerUser ? (
+        <View style={styles.kpiRow}>
+          <KPICard
             icon="time-outline"
-            label="Set Status"
+            label="Pending Reviews"
+            value={comptrollerStats.stats.pending}
             color="#2563eb"
-            onPress={() => {
-              // Open sidebar to set availability
-              setSidebarVisible(true);
-            }}
           />
-          <QuickActionButton
-            icon="star-outline"
-            label="Feedback"
+          <KPICard
+            icon="checkmark-circle-outline"
+            label="Approved (Month)"
+            value={comptrollerStats.stats.approved}
+            color="#16a34a"
+          />
+          <KPICard
+            icon="close-circle-outline"
+            label="Rejected (Month)"
+            value={comptrollerStats.stats.rejected}
+            color="#dc2626"
+          />
+          <KPICard
+            icon="cash-outline"
+            label="Budget Reviewed"
+            value={`₱${(comptrollerStats.stats.totalBudget / 1000).toFixed(0)}k`}
+            color="#7A0010"
+          />
+        </View>
+      ) : profile?.is_vp ? (
+        <View style={styles.kpiRow}>
+          <KPICard
+            icon="time-outline"
+            label="Pending Review"
+            value={vpStats.stats.pending}
             color="#f59e0b"
-            onPress={() => router.push('/feedback')}
           />
-          <QuickActionButton
-            icon="settings-outline"
-            label="Settings"
-            color="#6b7280"
-            onPress={() => router.push('/profile/settings')}
+          <KPICard
+            icon="checkmark-circle-outline"
+            label="Approved Today"
+            value={vpStats.stats.approvedToday}
+            color="#16a34a"
+          />
+          <KPICard
+            icon="cash-outline"
+            label="Budget (Month)"
+            value={`₱${(vpStats.stats.totalBudget / 1000).toFixed(0)}k`}
+            color="#2563eb"
+          />
+          <KPICard
+            icon="trending-up-outline"
+            label="Avg Time"
+            value={vpStats.stats.avgApprovalTime}
+            color="#9333ea"
           />
         </View>
-      </Animated.View>
+      ) : profile?.is_hr ? (
+        <View style={styles.kpiRow}>
+          <KPICard
+            icon="time-outline"
+            label="Pending HR"
+            value={hrStats.stats.pending}
+            color="#f59e0b"
+          />
+          <KPICard
+            icon="checkmark-circle-outline"
+            label="Approved Today"
+            value={hrStats.stats.approvedToday}
+            color="#16a34a"
+          />
+          <KPICard
+            icon="people-outline"
+            label="Active Requests"
+            value={kpis.activeRequests}
+            color="#2563eb"
+          />
+        </View>
+      ) : profile?.is_president ? (
+        <View style={styles.kpiRow}>
+          <KPICard
+            icon="time-outline"
+            label="Final Review"
+            value={presidentStats.stats.pending}
+            color="#f59e0b"
+          />
+          <KPICard
+            icon="checkmark-circle-outline"
+            label="Approved (Week)"
+            value={presidentStats.stats.approvedThisWeek}
+            color="#16a34a"
+          />
+          <KPICard
+            icon="cash-outline"
+            label="Budget (YTD)"
+            value={`₱${(presidentStats.stats.totalBudgetYTD / 1000000).toFixed(1)}M`}
+            color="#2563eb"
+          />
+          <KPICard
+            icon="business-outline"
+            label="Departments"
+            value={presidentStats.stats.activeDepartments}
+            color="#9333ea"
+          />
+        </View>
+      ) : (
+        <View style={styles.kpiRow}>
+          <KPICard
+            icon="document-text-outline"
+            label="Active Requests"
+            value={kpis.activeRequests}
+            color="#2563eb"
+          />
+          <KPICard
+            icon="car-outline"
+            label="Vehicles Online"
+            value={kpis.vehiclesOnline}
+            color="#16a34a"
+          />
+          <KPICard
+            icon="time-outline"
+            label="Pending Approvals"
+            value={kpis.pendingApprovals}
+            color="#f59e0b"
+          />
+        </View>
+      )}
 
-      {/* Available Vehicles */}
-      {vehicles.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <Ionicons name="car-outline" size={20} color="#7a0019" />
-              <Text style={styles.sectionTitle}>Available Vehicles</Text>
+      {/* Head Dashboard: Reorganized Order */}
+      {profile?.is_head ? (
+        <>
+          {/* 1. Feedback Widget First */}
+          {pendingEvaluations.pendingTrips.length > 0 && (
+            <ActionCard
+              title={`${pendingEvaluations.pendingTrips.length} Trip${pendingEvaluations.pendingTrips.length !== 1 ? 's' : ''} Need Your Feedback`}
+              subtitle="Please rate your completed trips"
+              icon="chatbubble-ellipses-outline"
+              color="#9333ea"
+              borderColor="#9333ea"
+              trips={pendingEvaluations.pendingTrips.slice(0, 1)}
+              onPress={() => router.push('/feedback')}
+            />
+          )}
+
+          {/* 2. Requests Needing Approval */}
+          {pendingApprovalsCount > 0 && (
+            <ActionCard
+              title={`${pendingApprovalsCount} Request${pendingApprovalsCount !== 1 ? 's' : ''} Need Your Approval`}
+              subtitle={pendingApprovalsCount === 1 ? '1 request waiting' : `${pendingApprovalsCount} requests waiting`}
+              icon="notifications-outline"
+              color="#dc2626"
+              borderColor="#dc2626"
+              requests={headInbox.requests.slice(0, 2)}
+              onPress={() => {
+                router.push('/(tabs)/inbox');
+              }}
+            />
+          )}
+
+          {/* 3. Calendar Widget */}
+          <CalendarWidget userId={profile.id} />
+
+          {/* 4. Available Vehicles (Clickable) */}
+          {vehicles.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Ionicons name="car-outline" size={20} color="#7a0019" />
+                  <Text style={styles.sectionTitle}>Available Vehicles</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/vehicles')}>
+                  <Text style={styles.viewAllLink}>View All →</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehiclesScroll}>
+                {vehicles.slice(0, 3).map((vehicle) => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                ))}
+              </ScrollView>
             </View>
-            <TouchableOpacity onPress={() => router.push('/vehicles')}>
-              <Text style={styles.viewAllLink}>View All →</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehiclesScroll}>
-            {vehicles.slice(0, 3).map((vehicle) => (
-              <VehicleCard key={vehicle.id} vehicle={vehicle} />
-            ))}
-          </ScrollView>
-        </View>
-      )}
+          )}
 
-      {/* Available Drivers */}
-      {drivers.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <Ionicons name="person-outline" size={20} color="#7a0019" />
-              <Text style={styles.sectionTitle}>Available Drivers</Text>
+          {/* 5. Available Drivers (Clickable) */}
+          {drivers.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Ionicons name="person-outline" size={20} color="#7a0019" />
+                  <Text style={styles.sectionTitle}>Available Drivers</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/drivers')}>
+                  <Text style={styles.viewAllLink}>View All →</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehiclesScroll}>
+                {drivers.slice(0, 3).map((driver) => (
+                  <DriverCard key={driver.id} driver={driver} />
+                ))}
+              </ScrollView>
             </View>
-            <TouchableOpacity onPress={() => router.push('/drivers')}>
-              <Text style={styles.viewAllLink}>View All →</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehiclesScroll}>
-            {drivers.slice(0, 3).map((driver) => (
-              <DriverCard key={driver.id} driver={driver} />
-            ))}
-          </ScrollView>
-        </View>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Non-Head Dashboard: Standard Order */}
+          {/* Action Cards - Role-based */}
+          {pendingApprovalsCount > 0 && (
+            <ActionCard
+              title={
+                isComptrollerUser
+                  ? `${pendingApprovalsCount} Budget Review${pendingApprovalsCount !== 1 ? 's' : ''} Pending`
+                  : `${pendingApprovalsCount} Request${pendingApprovalsCount !== 1 ? 's' : ''} Need Your Approval`
+              }
+              subtitle={
+                isComptrollerUser
+                  ? pendingApprovalsCount === 1 
+                    ? '1 budget review waiting for your approval' 
+                    : `${pendingApprovalsCount} budget reviews waiting for your approval`
+                  : pendingApprovalsCount === 1 
+                    ? '1 request waiting' 
+                    : `${pendingApprovalsCount} requests waiting`
+              }
+              icon={isComptrollerUser ? "calculator-outline" : "notifications-outline"}
+              color="#dc2626"
+              borderColor="#dc2626"
+              requests={
+                isComptrollerUser
+                  ? comptrollerInbox.requests.slice(0, 2)
+                  : profile?.is_hr
+                  ? hrInbox.requests.slice(0, 2)
+                  : profile?.is_vp
+                  ? vpInbox.requests.slice(0, 2)
+                  : profile?.is_president
+                  ? presidentInbox.requests.slice(0, 2)
+                  : []
+              }
+              onPress={() => {
+                if (isComptrollerUser) {
+                  router.push('/(tabs)/budget-review');
+                } else {
+                  router.push('/(tabs)/inbox');
+                }
+              }}
+            />
+          )}
+
+          {/* Calendar Widget */}
+          <CalendarWidget userId={profile.id} />
+
+          {/* Merged Upcoming Trips Widget */}
+          {(tripsStartingSoon.length > 0 || trips.length > 0) && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Ionicons name="calendar-outline" size={20} color="#7a0019" />
+                  <Text style={styles.sectionTitle}>Upcoming Trips</Text>
+                </View>
+                {trips.length > 3 && (
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/calendar')}>
+                    <Text style={styles.viewAllLink}>View All →</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {tripsStartingSoon.length > 0 ? (
+                <>
+                  {tripsStartingSoon.slice(0, 3).map((trip) => (
+                    <TripCard key={trip.id} trip={trip} />
+                  ))}
+                </>
+              ) : (
+                <>
+                  {trips.slice(0, 3).map((trip) => (
+                    <TripCard key={trip.id} trip={trip} />
+                  ))}
+                </>
+              )}
+            </View>
+          )}
+
+          {pendingEvaluations.pendingTrips.length > 0 && (
+            <ActionCard
+              title={`${pendingEvaluations.pendingTrips.length} Trip${pendingEvaluations.pendingTrips.length !== 1 ? 's' : ''} Need Your Feedback`}
+              subtitle="Please rate your completed trips"
+              icon="document-text-outline"
+              color="#9333ea"
+              borderColor="#9333ea"
+              trips={pendingEvaluations.pendingTrips.slice(0, 1)}
+              onPress={() => router.push('/feedback')}
+            />
+          )}
+
+          {/* Available Vehicles */}
+          {vehicles.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Ionicons name="car-outline" size={20} color="#7a0019" />
+                  <Text style={styles.sectionTitle}>Available Vehicles</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/vehicles')}>
+                  <Text style={styles.viewAllLink}>View All →</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehiclesScroll}>
+                {vehicles.slice(0, 3).map((vehicle) => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Available Drivers */}
+          {drivers.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Ionicons name="person-outline" size={20} color="#7a0019" />
+                  <Text style={styles.sectionTitle}>Available Drivers</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/drivers')}>
+                  <Text style={styles.viewAllLink}>View All →</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehiclesScroll}>
+                {drivers.slice(0, 3).map((driver) => (
+                  <DriverCard key={driver.id} driver={driver} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </>
       )}
 
-      {/* Upcoming Trips */}
-      {trips.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming Trips</Text>
-          {trips.slice(0, 6).map((trip) => (
-            <TripCard key={trip.id} trip={trip} />
-          ))}
-        </View>
-      )}
+
 
       {/* Bottom padding to account for navbar */}
       <View style={{ height: Platform.OS === 'ios' ? 100 : 80 }} />
-      </ScrollView>
+        </ScrollView>
+      </PanGestureHandler>
       <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -274,60 +605,20 @@ function KPICard({
   );
 }
 
-function QuickActionButton({
-  icon,
-  label,
-  color,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  color: string;
-  onPress: () => void;
-}) {
-  const scaleAnim = React.useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.97,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-    >
-      <Animated.View
-        style={[
-          styles.quickActionButton,
-          {
-            transform: [{ scale: scaleAnim }],
-          },
-        ]}
-      >
-        <View style={[styles.quickActionIconContainer, { backgroundColor: color }]}>
-          <Ionicons name={icon} size={22} color="#fff" />
-        </View>
-        <Text style={styles.quickActionLabel}>{label}</Text>
-      </Animated.View>
-    </TouchableOpacity>
-  );
-}
-
 function VehicleCard({ vehicle }: { vehicle: any }) {
   return (
-    <View style={styles.vehicleCard}>
+    <TouchableOpacity
+      style={styles.vehicleCard}
+      onPress={() => {
+        // Show vehicle details modal or navigate to vehicle details
+        Alert.alert(
+          vehicle.vehicle_name,
+          `Plate: ${vehicle.plate_number}\nType: ${vehicle.type || 'N/A'}\nCapacity: ${vehicle.capacity || 'N/A'} seats\nStatus: ${vehicle.status || 'Available'}`,
+          [{ text: 'OK' }]
+        );
+      }}
+      activeOpacity={0.7}
+    >
       {vehicle.photo_url ? (
         <Image source={{ uri: vehicle.photo_url }} style={styles.vehicleImage} resizeMode="cover" />
       ) : (
@@ -346,7 +637,7 @@ function VehicleCard({ vehicle }: { vehicle: any }) {
         <Ionicons name="people-outline" size={14} color="#6b7280" />
         <Text style={styles.vehicleCapacityText}>{vehicle.capacity} seats</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -354,7 +645,14 @@ function DriverCard({ driver }: { driver: any }) {
   return (
     <TouchableOpacity
       style={styles.driverCard}
-      onPress={() => router.push('/drivers')}
+      onPress={() => {
+        // Show driver details modal
+        Alert.alert(
+          driver.name,
+          `Email: ${driver.email || 'N/A'}\nPhone: ${driver.phone_number || driver.phone || 'N/A'}\nLicense: ${driver.license_no || 'N/A'}\nRating: ${driver.driver_rating ? driver.driver_rating.toFixed(1) : 'N/A'}\nStatus: ${driver.status || 'Available'}`,
+          [{ text: 'OK' }]
+        );
+      }}
       activeOpacity={0.7}
     >
       {driver.profile_picture ? (
@@ -419,6 +717,90 @@ function TripCard({ trip }: { trip: any }) {
         )}
       </View>
     </TouchableOpacity>
+  );
+}
+
+function ActionCard({
+  title,
+  subtitle,
+  icon,
+  color,
+  borderColor,
+  requests,
+  trips,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  borderColor: string;
+  requests?: any[];
+  trips?: any[];
+  onPress: () => void;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+    if (Haptics) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        style={[styles.actionCard, { borderLeftColor: borderColor }]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+      <View style={styles.actionCardContent}>
+        <View style={[styles.actionCardIconContainer, { backgroundColor: color + '20' }]}>
+          <Ionicons name={icon} size={24} color={color} />
+        </View>
+        <View style={styles.actionCardText}>
+          <Text style={styles.actionCardTitle}>{title}</Text>
+          <Text style={styles.actionCardSubtitle}>{subtitle}</Text>
+          {requests && requests.length > 0 && (
+            <View style={styles.actionCardItems}>
+              {requests.slice(0, 2).map((req, idx) => (
+                <Text key={idx} style={styles.actionCardItem} numberOfLines={1}>
+                  • {req.request_number || req.title || 'Request'}
+                </Text>
+              ))}
+            </View>
+          )}
+          {trips && trips.length > 0 && (
+            <View style={styles.actionCardItems}>
+              {trips.slice(0, 1).map((trip, idx) => (
+                <Text key={idx} style={styles.actionCardItem} numberOfLines={1}>
+                  • {trip.destination || 'Trip'}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+        <Ionicons name="chevron-forward-outline" size={20} color={color} />
+      </View>
+    </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -498,39 +880,42 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   hero: {
-    backgroundColor: '#7a0019',
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    backgroundColor: '#7A0010',
+    padding: 24,
+    paddingTop: Platform.OS === 'ios' ? 50 : 24,
+    paddingBottom: 24,
+    marginBottom: 20,
   },
   heroContent: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   heroGreeting: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#fff',
     opacity: 0.9,
     marginBottom: 4,
   },
   heroName: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  heroTimeContainer: {
+  heroStats: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 4,
+  },
+  heroStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  heroTime: {
-    fontSize: 14,
+  heroStatText: {
+    fontSize: 13,
     color: '#fff',
     opacity: 0.9,
-  },
-  heroTimeSeparator: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.5,
+    fontWeight: '500',
   },
   heroActions: {
     flexDirection: 'row',
@@ -550,7 +935,7 @@ const styles = StyleSheet.create({
   heroButtonPrimaryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#7a0019',
+    color: '#7A0010',
   },
   heroButtonSecondary: {
     flexDirection: 'row',
@@ -572,15 +957,16 @@ const styles = StyleSheet.create({
   kpiRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingTop: 20,
+    paddingBottom: 12,
     gap: 12,
+    marginBottom: 4,
   },
   kpiCard: {
     flex: 1,
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    padding: 18,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e5e7eb',
@@ -596,7 +982,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   kpiValue: {
     fontSize: 24,
@@ -614,9 +1000,9 @@ const styles = StyleSheet.create({
   section: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
@@ -629,7 +1015,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionHeaderLeft: {
     flexDirection: 'row',
@@ -648,40 +1034,7 @@ const styles = StyleSheet.create({
   viewAllLink: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#7a0019',
-  },
-  quickActionsGrid: {
-    gap: 12,
-  },
-  quickActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  quickActionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickActionLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    flex: 1,
+    color: '#7A0010',
   },
   vehiclesScroll: {
     marginHorizontal: -16,
@@ -771,7 +1124,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#7a0019',
+    backgroundColor: '#7A0010',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -817,8 +1170,8 @@ const styles = StyleSheet.create({
   tripCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 18,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
@@ -918,6 +1271,54 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 11,
     color: '#6b7280',
+  },
+  actionCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  actionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  actionCardIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionCardText: {
+    flex: 1,
+  },
+  actionCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  actionCardSubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 6,
+  },
+  actionCardItems: {
+    marginTop: 4,
+  },
+  actionCardItem: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
   },
 });
 

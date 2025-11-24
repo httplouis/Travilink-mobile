@@ -58,8 +58,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.error('[AuthContext] Error fetching profile:', error);
-        console.error('[AuthContext] Error details:', JSON.stringify(error, null, 2));
+        // Don't log HTML error pages or abort errors
+        const errorMessage = error.message || '';
+        const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
+        const isAbortError = errorMessage.includes('Aborted') || errorMessage.includes('abort') || error.name === 'AbortError';
+        const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+        
+        if (!isHtmlError && !isAbortError && !isTimeoutError) {
+          // Only log meaningful errors
+          console.warn('[AuthContext] Error fetching profile:', error.code || error.message || 'Unknown error');
+        }
         return null;
       }
 
@@ -113,8 +121,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         status: data.status || 'active',
         availability_status: (data.availability_status as 'online' | 'busy' | 'off_work' | 'on_leave') || 'online',
       };
-    } catch (error) {
-      console.error('[AuthContext] Exception in fetchProfile:', error);
+    } catch (error: any) {
+      // Don't log HTML error pages, abort errors, or timeouts
+      const errorMessage = error?.message || '';
+      const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
+      const isAbortError = errorMessage.includes('Aborted') || errorMessage.includes('abort') || error?.name === 'AbortError';
+      const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+      
+      if (!isHtmlError && !isAbortError && !isTimeoutError) {
+        // Only log meaningful errors
+        console.warn('[AuthContext] Exception in fetchProfile:', error?.code || error?.message || 'Unknown error');
+      }
       return null;
     }
   };
@@ -143,8 +160,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(userProfile);
       }
       return userProfile;
-    } catch (error) {
-      console.error('[AuthContext] fetchProfileByUserId error:', error);
+    } catch (error: any) {
+      // Don't log HTML error pages, abort errors, or timeouts
+      const errorMessage = error?.message || '';
+      const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
+      const isAbortError = errorMessage.includes('Aborted') || errorMessage.includes('abort') || error?.name === 'AbortError';
+      const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+      
+      if (!isHtmlError && !isAbortError && !isTimeoutError) {
+        // Only log meaningful errors
+        console.warn('[AuthContext] fetchProfileByUserId error:', error?.code || error?.message || 'Unknown error');
+      }
       // Return null on error/timeout - don't block login
       return null;
     }
@@ -210,34 +236,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }, 10000); // 10 second timeout
 
-        // Wrap getSession in a timeout promise to prevent hanging
-        const sessionPromise = supabase.auth.getSession();
-        const sessionTimeoutPromise = new Promise<{ data: { session: null }, error: null }>((resolve) => 
-          setTimeout(() => {
-            console.warn('[AuthContext] getSession timeout, resolving with no session');
-            resolve({ data: { session: null }, error: null });
-          }, 8000) // 8 second timeout for getSession
-        );
-
-        const result = await Promise.race([sessionPromise, sessionTimeoutPromise]);
-        const { data: { session }, error } = result || { data: { session: null }, error: null };
+        // Get session - don't timeout, let Supabase handle it
+        // If there's a network issue, we'll retry later rather than signing out
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        // Handle refresh token errors
-        if (error && (error.message?.includes('refresh_token') || error.message?.includes('Refresh Token'))) {
-          console.warn('[AuthContext] Refresh token error, clearing session:', error.message);
-          // Clear invalid session
-          try {
-            await supabase.auth.signOut();
-          } catch (signOutError) {
-            // Ignore sign out errors
+        // Only handle refresh token errors - don't sign out on network timeouts
+        if (error) {
+          const errorMessage = error.message || '';
+          const isRefreshTokenError = errorMessage.includes('refresh_token') || 
+                                     errorMessage.includes('Refresh Token') ||
+                                     error.code === 'invalid_refresh_token';
+          
+          if (isRefreshTokenError) {
+            console.warn('[AuthContext] Refresh token error, clearing session:', error.message);
+            // Clear invalid session only for actual token errors
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutError) {
+              // Ignore sign out errors
+            }
+            if (mounted) {
+              setSession(null);
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
+            }
+            return;
+          } else {
+            // Network or other errors - log but don't sign out
+            console.warn('[AuthContext] Session fetch error (non-critical):', error.message || error.code);
+            // Continue with existing session if available, or null if not
           }
-          if (mounted) {
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-          }
-          return;
         }
         
         if (timeoutId) {
@@ -247,12 +276,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!mounted) return;
 
-        if (error) {
-          console.error('[AuthContext] Session error:', error);
-          setLoading(false);
-          return;
-        }
-
+        // Set session even if there was an error (might be network issue, not auth issue)
+        // Only skip if it was a refresh token error (already handled above)
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -268,8 +293,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (mounted) {
               setProfile(userProfile);
             }
-          } catch (profileError) {
-            console.error('[AuthContext] Profile fetch error:', profileError);
+          } catch (profileError: any) {
+            // Don't log HTML error pages, abort errors, or timeouts
+            const errorMessage = profileError?.message || '';
+            const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
+            const isAbortError = errorMessage.includes('Aborted') || errorMessage.includes('abort') || profileError?.name === 'AbortError';
+            const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+            
+            if (!isHtmlError && !isAbortError && !isTimeoutError) {
+              // Only log meaningful errors
+              console.warn('[AuthContext] Profile fetch error:', profileError?.code || profileError?.message || 'Unknown error');
+            }
             if (mounted) {
               setProfile(null);
             }
@@ -277,8 +311,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setProfile(null);
         }
-      } catch (error) {
-        console.error('[AuthContext] Initialization error:', error);
+      } catch (error: any) {
+        // Don't log HTML error pages, abort errors, or timeouts
+        const errorMessage = error?.message || '';
+        const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
+        const isAbortError = errorMessage.includes('Aborted') || errorMessage.includes('abort') || error?.name === 'AbortError';
+        const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+        
+        if (!isHtmlError && !isAbortError && !isTimeoutError) {
+          // Only log meaningful errors
+          console.warn('[AuthContext] Initialization error:', error?.code || error?.message || 'Unknown error');
+        }
       } finally {
         if (timeoutId) {
           clearTimeout(timeoutId);
@@ -299,13 +342,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[AuthContext] Auth state changed:', event, session?.user?.email || 'no user');
       
-      // Handle refresh token errors
+      // Handle SIGNED_OUT events
       if (event === 'SIGNED_OUT' && !session) {
-        // If signed out due to invalid refresh token, clear state
-        console.log('[AuthContext] Session expired or invalid, clearing state');
+        // Only clear state on explicit sign out, not on network errors
+        // Supabase will emit SIGNED_OUT for actual logout or expired tokens
+        console.log('[AuthContext] User signed out event received');
         setSession(null);
         setUser(null);
         setProfile(null);
+        if (mounted) {
+          setLoading(false);
+        }
+        // Don't navigate away automatically - let the app handle routing
+        // This prevents accidental redirects on network issues
+        return;
+      }
+      
+      // Don't clear state on TOKEN_REFRESHED errors - these are recoverable
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        console.warn('[AuthContext] Token refresh failed, but keeping existing session if available');
+        // Keep existing session state, don't clear it
         if (mounted) {
           setLoading(false);
         }
@@ -324,8 +380,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (mounted) {
               setProfile(userProfile);
             }
-          }).catch((error) => {
-            console.error('[AuthContext] Profile fetch error after sign in:', error);
+          }).catch((error: any) => {
+            // Don't log HTML error pages, abort errors, or timeouts
+            const errorMessage = error?.message || '';
+            const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
+            const isAbortError = errorMessage.includes('Aborted') || errorMessage.includes('abort') || error?.name === 'AbortError';
+            const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+            
+            if (!isHtmlError && !isAbortError && !isTimeoutError) {
+              // Only log meaningful errors
+              console.warn('[AuthContext] Profile fetch error after sign in:', error?.code || error?.message || 'Unknown error');
+            }
             // Don't block - continue without profile
           });
         } else {
@@ -335,8 +400,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (mounted) {
               setProfile(userProfile);
             }
-          } catch (error) {
-            console.error('[AuthContext] Profile fetch error:', error);
+          } catch (error: any) {
+            // Don't log HTML error pages, abort errors, or timeouts
+            const errorMessage = error?.message || '';
+            const isHtmlError = errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html');
+            const isAbortError = errorMessage.includes('Aborted') || errorMessage.includes('abort') || error?.name === 'AbortError';
+            const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+            
+            if (!isHtmlError && !isAbortError && !isTimeoutError) {
+              // Only log meaningful errors
+              console.warn('[AuthContext] Profile fetch error:', error?.code || error?.message || 'Unknown error');
+            }
             // Continue without profile update
           }
         }

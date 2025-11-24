@@ -3,421 +3,318 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Modal,
+  TouchableOpacity,
   FlatList,
+  TextInput,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Vehicle } from '@/hooks/useVehicles';
-import { Driver } from '@/hooks/useDrivers';
+import { useVehicles } from '@/hooks/useVehicles';
+import { useDrivers } from '@/hooks/useDrivers';
 
 interface VehicleDriverSelectionProps {
-  vehicles: Vehicle[];
-  drivers: Driver[];
-  selectedVehicleId: string | null;
-  selectedDriverId: string | null;
-  onVehicleSelect: (vehicleId: string | null) => void;
-  onDriverSelect: (driverId: string | null) => void;
-  loading?: boolean;
+  visible: boolean;
+  onClose: () => void;
+  type: 'vehicle' | 'driver';
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
 }
 
 export default function VehicleDriverSelection({
-  vehicles,
-  drivers,
-  selectedVehicleId,
-  selectedDriverId,
-  onVehicleSelect,
-  onDriverSelect,
-  loading = false,
+  visible,
+  onClose,
+  type,
+  selectedId,
+  onSelect,
 }: VehicleDriverSelectionProps) {
-  const [showVehicleModal, setShowVehicleModal] = useState(false);
-  const [showDriverModal, setShowDriverModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const { vehicles, isLoading: vehiclesLoading } = useVehicles({ available: true });
+  const { data: drivers, isLoading: driversLoading } = useDrivers({ status: 'active' });
 
-  const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
-  const selectedDriver = drivers.find((d) => d.id === selectedDriverId);
+  const isLoading = type === 'vehicle' ? vehiclesLoading : driversLoading;
+  const items = type === 'vehicle' 
+    ? vehicles.filter(v => 
+        !searchQuery.trim() || 
+        v.vehicle_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        v.plate_number.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : (drivers || []).filter(d =>
+        !searchQuery.trim() ||
+        d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        d.email?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+  const handleSelect = (id: string | null) => {
+    onSelect(id);
+    onClose();
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>School Service Request</Text>
-        <Text style={styles.subtitle}>
-          Suggest your preferred driver and vehicle (optional). The admin will make the final assignment.
-        </Text>
-      </View>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.overlay}>
+        <View style={styles.modal}>
+          <View style={styles.header}>
+            <Text style={styles.title}>
+              Select {type === 'vehicle' ? 'Preferred Vehicle' : 'Preferred Driver'}
+            </Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#111827" />
+            </TouchableOpacity>
+          </View>
 
-      {/* Driver Selection */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Preferred Driver (Suggestion)</Text>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowDriverModal(true)}
-          disabled={loading}
-        >
-          <Text style={[styles.selectText, !selectedDriver && styles.selectPlaceholder]}>
-            {selectedDriver ? selectedDriver.user?.name || 'Unknown' : 'Select a driver (optional)'}
+          <Text style={styles.subtitle}>
+            Choose a {type === 'vehicle' ? 'vehicle' : 'driver'}
           </Text>
-          <Ionicons name="chevron-down" size={20} color="#6b7280" />
-        </TouchableOpacity>
-        {selectedDriver && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={() => onDriverSelect(null)}
-          >
-            <Ionicons name="close-circle" size={16} color="#dc2626" />
-            <Text style={styles.clearText}>Clear</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Vehicle Selection */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Preferred Vehicle (Suggestion)</Text>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowVehicleModal(true)}
-          disabled={loading}
-        >
-          <Text style={[styles.selectText, !selectedVehicle && styles.selectPlaceholder]}>
-            {selectedVehicle
-              ? `${selectedVehicle.vehicle_name} • ${selectedVehicle.plate_number}`
-              : 'Select a vehicle (optional)'}
-          </Text>
-          <Ionicons name="chevron-down" size={20} color="#6b7280" />
-        </TouchableOpacity>
-        {selectedVehicle && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={() => onVehicleSelect(null)}
-          >
-            <Ionicons name="close-circle" size={16} color="#dc2626" />
-            <Text style={styles.clearText}>Clear</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Driver Selection Modal */}
-      <Modal
-        visible={showDriverModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDriverModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Driver</Text>
-              <TouchableOpacity onPress={() => setShowDriverModal(false)}>
-                <Ionicons name="close" size={24} color="#111827" />
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={20} color="#6b7280" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={`Search ${type === 'vehicle' ? 'vehicles' : 'drivers'}...`}
+              placeholderTextColor="#9ca3af"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                <Ionicons name="close-circle" size={20} color="#9ca3af" />
               </TouchableOpacity>
-            </View>
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#7a0019" />
-                <Text style={styles.loadingText}>Loading drivers...</Text>
-              </View>
-            ) : drivers.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="person-outline" size={48} color="#9ca3af" />
-                <Text style={styles.emptyText}>No drivers available</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={drivers}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.modalItem,
-                      selectedDriverId === item.id && styles.modalItemSelected,
-                    ]}
-                    onPress={() => {
-                      onDriverSelect(item.id);
-                      setShowDriverModal(false);
-                    }}
-                  >
-                    <View style={styles.modalItemContent}>
-                      <View style={styles.modalItemAvatar}>
-                        <Text style={styles.modalItemAvatarText}>
-                          {item.user?.name?.charAt(0).toUpperCase() || 'D'}
-                        </Text>
-                      </View>
-                      <View style={styles.modalItemText}>
-                        <Text style={styles.modalItemName}>{item.user?.name || 'Unknown Driver'}</Text>
-                        {item.user?.position_title && (
-                          <Text style={styles.modalItemSubtitle}>{item.user.position_title}</Text>
-                        )}
-                        {item.license_number && (
-                          <Text style={styles.modalItemSubtitle}>License: {item.license_number}</Text>
-                        )}
-                      </View>
-                    </View>
-                    {selectedDriverId === item.id && (
-                      <Ionicons name="checkmark-circle" size={24} color="#7a0019" />
-                    )}
-                  </TouchableOpacity>
-                )}
-                ListFooterComponent={
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => {
-                      onDriverSelect(null);
-                      setShowDriverModal(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemClear}>Clear Selection</Text>
-                  </TouchableOpacity>
-                }
-              />
             )}
           </View>
-        </View>
-      </Modal>
 
-      {/* Vehicle Selection Modal */}
-      <Modal
-        visible={showVehicleModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowVehicleModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Vehicle</Text>
-              <TouchableOpacity onPress={() => setShowVehicleModal(false)}>
-                <Ionicons name="close" size={24} color="#111827" />
-              </TouchableOpacity>
+          {/* List */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#7a0019" />
+              <Text style={styles.loadingText}>Loading...</Text>
             </View>
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#7a0019" />
-                <Text style={styles.loadingText}>Loading vehicles...</Text>
-              </View>
-            ) : vehicles.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="car-outline" size={48} color="#9ca3af" />
-                <Text style={styles.emptyText}>No vehicles available</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={vehicles}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.modalItem,
-                      selectedVehicleId === item.id && styles.modalItemSelected,
-                    ]}
-                    onPress={() => {
-                      onVehicleSelect(item.id);
-                      setShowVehicleModal(false);
-                    }}
-                  >
-                    <View style={styles.modalItemContent}>
-                      <View style={styles.modalItemIcon}>
-                        <Ionicons name="car" size={24} color="#7a0019" />
-                      </View>
-                      <View style={styles.modalItemText}>
-                        <Text style={styles.modalItemName}>{item.vehicle_name}</Text>
-                        <Text style={styles.modalItemSubtitle}>Plate: {item.plate_number}</Text>
-                        <Text style={styles.modalItemSubtitle}>
-                          {item.capacity} seats • {item.vehicle_type}
-                        </Text>
-                      </View>
+          ) : items.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons 
+                name={type === 'vehicle' ? 'car-outline' : 'person-outline'} 
+                size={48} 
+                color="#9ca3af" 
+              />
+              <Text style={styles.emptyText}>
+                {searchQuery ? 'No results found' : `No ${type === 'vehicle' ? 'vehicles' : 'drivers'} available`}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={items}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.item,
+                    selectedId === item.id && styles.itemSelected,
+                  ]}
+                  onPress={() => handleSelect(item.id)}
+                >
+                  <View style={styles.itemContent}>
+                    <View style={styles.itemIcon}>
+                      <Ionicons
+                        name={type === 'vehicle' ? 'car-outline' : 'person-outline'}
+                        size={24}
+                        color={selectedId === item.id ? '#7a0019' : '#6b7280'}
+                      />
                     </View>
-                    {selectedVehicleId === item.id && (
+                    <View style={styles.itemInfo}>
+                      {type === 'vehicle' ? (
+                        <>
+                          <Text style={styles.itemName}>
+                            {(item as any).vehicle_name}
+                          </Text>
+                          <Text style={styles.itemDetail}>
+                            {(item as any).plate_number} • {(item as any).type || 'N/A'}
+                          </Text>
+                          {(item as any).capacity && (
+                            <Text style={styles.itemSubDetail}>
+                              {(item as any).capacity} seats
+                            </Text>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.itemName}>
+                            {item.name}
+                          </Text>
+                          {item.email && (
+                            <Text style={styles.itemDetail}>
+                              {item.email}
+                            </Text>
+                          )}
+                          {(item as any).license_no && (
+                            <Text style={styles.itemSubDetail}>
+                              License: {(item as any).license_no}
+                            </Text>
+                          )}
+                        </>
+                      )}
+                    </View>
+                    {selectedId === item.id && (
                       <Ionicons name="checkmark-circle" size={24} color="#7a0019" />
                     )}
-                  </TouchableOpacity>
-                )}
-                ListFooterComponent={
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => {
-                      onVehicleSelect(null);
-                      setShowVehicleModal(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemClear}>Clear Selection</Text>
-                  </TouchableOpacity>
-                }
-              />
-            )}
-          </View>
+                  </View>
+                </TouchableOpacity>
+              )}
+              style={styles.list}
+            />
+          )}
+
+          {/* Cancel Button */}
+          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
-    </View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginTop: 8,
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#6b7280',
-    lineHeight: 18,
-  },
-  fieldContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 10,
-  },
-  selectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    minHeight: 56,
-  },
-  selectText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
-  },
-  selectPlaceholder: {
-    color: '#9ca3af',
-    fontWeight: '400',
-  },
-  clearButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  clearText: {
-    fontSize: 13,
-    color: '#dc2626',
-    fontWeight: '600',
-  },
-  modalOverlay: {
+  overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
+  modal: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 20,
+    maxHeight: '85%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  modalItem: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: '#e5e7eb',
   },
-  modalItemSelected: {
-    backgroundColor: '#fef2f2',
-  },
-  modalItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  modalItemAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#7a0019',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalItemAvatarText: {
+  title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: '#111827',
   },
-  modalItemIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#fef2f2',
+  closeButton: {
+    padding: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  searchContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+    paddingHorizontal: 12,
   },
-  modalItemText: {
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
     flex: 1,
+    fontSize: 16,
+    color: '#111827',
+    paddingVertical: 0,
   },
-  modalItemName: {
+  clearButton: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  list: {
+    flex: 1,
+    maxHeight: 400,
+  },
+  item: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  itemSelected: {
+    backgroundColor: '#fef2f2',
+  },
+  itemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  itemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  itemName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
   },
-  modalItemSubtitle: {
-    fontSize: 13,
+  itemDetail: {
+    fontSize: 14,
     color: '#6b7280',
-    marginTop: 2,
   },
-  modalItemClear: {
+  itemSubDetail: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  cancelButton: {
+    margin: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 16,
+  },
+  cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#dc2626',
-    textAlign: 'center',
-    paddingVertical: 8,
+    color: '#7a0019',
   },
 });
-

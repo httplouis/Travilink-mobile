@@ -22,25 +22,25 @@ export function getTabsForRole(profile: UserProfile | null): TabConfig[] {
       { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
       { name: 'submissions', label: 'Requests', icon: 'list-outline', iconFocused: 'list', route: '/(tabs)/submissions' },
       { name: 'request', label: 'Request', icon: 'add-circle-outline', iconFocused: 'add-circle', route: '/(tabs)/request' },
-      { name: 'history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
+      { name: 'submissions-history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
       { name: 'more', label: 'More', icon: 'ellipsis-horizontal-outline', iconFocused: 'ellipsis-horizontal', route: '/(tabs)/more' },
     ];
   }
 
   const isComptrollerUser = isComptroller(profile.email);
 
-  // Comptroller: Home | Budget Review | Request | History | More
+  // Comptroller: Home | Budget Review | Request | Requests | More
   if (isComptrollerUser) {
     return [
       { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
       { name: 'budget-review', label: 'Budget', icon: 'calculator-outline', iconFocused: 'calculator', route: '/(tabs)/budget-review' },
       { name: 'request', label: 'Request', icon: 'add-circle-outline', iconFocused: 'add-circle', route: '/(tabs)/request' },
-      { name: 'history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
+      { name: 'submissions', label: 'Requests', icon: 'list-outline', iconFocused: 'list', route: '/(tabs)/submissions' },
       { name: 'more', label: 'More', icon: 'ellipsis-horizontal-outline', iconFocused: 'ellipsis-horizontal', route: '/(tabs)/more' },
     ];
   }
 
-  // Head: Home | Inbox | Request | Submissions | More
+  // Head: Home | Inbox | Request | Requests | More
   if (profile.is_head) {
     return [
       { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
@@ -51,45 +51,45 @@ export function getTabsForRole(profile: UserProfile | null): TabConfig[] {
     ];
   }
 
-  // VP: Home | Inbox | Request | History | More
+  // VP: Home | Inbox | Request | Requests | More
   if (profile.is_vp) {
     return [
       { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
       { name: 'inbox', label: 'Inbox', icon: 'mail-outline', iconFocused: 'mail', route: '/(tabs)/inbox' },
       { name: 'request', label: 'Request', icon: 'add-circle-outline', iconFocused: 'add-circle', route: '/(tabs)/request' },
-      { name: 'history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
+      { name: 'submissions', label: 'Requests', icon: 'list-outline', iconFocused: 'list', route: '/(tabs)/submissions' },
       { name: 'more', label: 'More', icon: 'ellipsis-horizontal-outline', iconFocused: 'ellipsis-horizontal', route: '/(tabs)/more' },
     ];
   }
 
-  // President: Home | Inbox | Request | History | More
+  // President: Home | Inbox | Request | Requests | More
   if (profile.is_president) {
     return [
       { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
       { name: 'inbox', label: 'Inbox', icon: 'mail-outline', iconFocused: 'mail', route: '/(tabs)/inbox' },
       { name: 'request', label: 'Request', icon: 'add-circle-outline', iconFocused: 'add-circle', route: '/(tabs)/request' },
-      { name: 'history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
+      { name: 'submissions', label: 'Requests', icon: 'list-outline', iconFocused: 'list', route: '/(tabs)/submissions' },
       { name: 'more', label: 'More', icon: 'ellipsis-horizontal-outline', iconFocused: 'ellipsis-horizontal', route: '/(tabs)/more' },
     ];
   }
 
-  // HR: Home | Inbox | Request | History | More
+  // HR: Home | Inbox | Request | Requests | More
   if (profile.is_hr) {
     return [
       { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
       { name: 'inbox', label: 'Inbox', icon: 'mail-outline', iconFocused: 'mail', route: '/(tabs)/inbox' },
       { name: 'request', label: 'Request', icon: 'add-circle-outline', iconFocused: 'add-circle', route: '/(tabs)/request' },
-      { name: 'history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
+      { name: 'submissions', label: 'Requests', icon: 'list-outline', iconFocused: 'list', route: '/(tabs)/submissions' },
       { name: 'more', label: 'More', icon: 'ellipsis-horizontal-outline', iconFocused: 'ellipsis-horizontal', route: '/(tabs)/more' },
     ];
   }
 
-  // Faculty/Regular User: Home | Submissions | Request | History | More
+  // Faculty/Regular User: Home | Submissions | Request | Requests | More
   return [
     { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
     { name: 'submissions', label: 'Requests', icon: 'list-outline', iconFocused: 'list', route: '/(tabs)/submissions' },
     { name: 'request', label: 'Request', icon: 'add-circle-outline', iconFocused: 'add-circle', route: '/(tabs)/request' },
-    { name: 'history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
+    { name: 'submissions-history', label: 'History', icon: 'time-outline', iconFocused: 'time', route: '/(tabs)/submissions?filter=history' },
     { name: 'more', label: 'More', icon: 'ellipsis-horizontal-outline', iconFocused: 'ellipsis-horizontal', route: '/(tabs)/more' },
   ];
 }

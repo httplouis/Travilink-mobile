@@ -68,8 +68,13 @@ export default function ValidationSummary({
         <View style={styles.container}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Ionicons name="alert-circle" size={24} color="#dc2626" />
-              <Text style={styles.title}>Missing Required Fields</Text>
+              <View style={styles.iconContainer}>
+                <Ionicons name="alert-circle" size={24} color="#dc2626" />
+              </View>
+              <View style={styles.titleContainer}>
+                <Text style={styles.title}>Please Complete Required Fields</Text>
+                <Text style={styles.titleSubtext}>We need a bit more information to proceed</Text>
+              </View>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#6b7280" />
@@ -78,7 +83,7 @@ export default function ValidationSummary({
 
           <View style={styles.content}>
             <Text style={styles.subtitle}>
-              Please complete the following {errorEntries.length} field{errorEntries.length !== 1 ? 's' : ''}:
+              Please fill in the following {errorEntries.length} field{errorEntries.length !== 1 ? 's' : ''} to continue:
             </Text>
 
             <ScrollView style={styles.errorList} showsVerticalScrollIndicator={true}>
@@ -152,14 +157,26 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
     flex: 1,
+  },
+  iconContainer: {
+    paddingTop: 2,
+  },
+  titleContainer: {
+    flex: 1,
+    gap: 4,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
+  },
+  titleSubtext: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '400',
   },
   closeButton: {
     padding: 4,

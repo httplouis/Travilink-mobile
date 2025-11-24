@@ -23,6 +23,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils';
 import { useRequestTracking } from '@/hooks/useRequestTracking';
 import { Linking } from 'react-native';
+import { useDuplicateRequest } from '@/hooks/useDuplicateRequest';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RequestDetailsScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
@@ -36,9 +38,27 @@ export default function RequestDetailsScreen() {
   const request = trackingData?.request;
   const isLoading = isLoadingTracking;
   const error = trackingError;
+  const { profile } = useAuth();
+  const { duplicateRequest, duplicating } = useDuplicateRequest({ requestId: id || '' });
   
   const refetch = async () => {
     await refetchTracking();
+  };
+
+  const handleDuplicate = async () => {
+    Alert.alert(
+      'Duplicate Request',
+      'This will create a copy of this request that you can edit and submit.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Duplicate',
+          onPress: async () => {
+            await duplicateRequest();
+          },
+        },
+      ]
+    );
   };
 
   const handleRefresh = async () => {
@@ -72,7 +92,12 @@ export default function RequestDetailsScreen() {
   }
 
   const hasParentHead = !!request?.parent_department_id;
-  const requiresPresidentApproval = (request?.total_budget || 0) > 50000;
+  // Updated threshold: Faculty requests with budget >15,000 go to President
+  // Heads always go to President regardless of budget
+  const isFaculty = !request?.requester_is_head;
+  const requiresPresidentApproval = isFaculty 
+    ? (request?.total_budget || 0) > 15000 
+    : true; // Heads always go to President
   
   // Get approver names from tracking data
   const headApproverName = trackingData?.headApprover?.name || null;
@@ -139,16 +164,39 @@ export default function RequestDetailsScreen() {
               <Text style={styles.headerCardDetailText}>{request.destination}</Text>
             </View>
           </View>
-          {/* PDF Download Button - Show when approved */}
-          {request.status === 'approved' && (
-            <View style={styles.pdfDownloadContainer}>
+          {/* Action Buttons */}
+          <View style={styles.actionButtonsContainer}>
+            {/* PDF Download Button - Show when approved */}
+            {request.status === 'approved' && (
+              <View style={styles.pdfDownloadContainer}>
               <PDFDownloadButton
                 requestId={request.id}
                 fileCode={request.file_code || undefined}
                 requestNumber={request.request_number}
+                requesterName={request.requester_name}
+                requestType={request.request_type}
               />
-            </View>
-          )}
+              </View>
+            )}
+            
+            {/* Duplicate Request Button - Show for requester */}
+            {profile?.id === request.requester_id && request.status !== 'draft' && (
+              <TouchableOpacity
+                style={styles.duplicateButton}
+                onPress={handleDuplicate}
+                disabled={duplicating}
+              >
+                {duplicating ? (
+                  <ActivityIndicator size="small" color="#7a0019" />
+                ) : (
+                  <>
+                    <Ionicons name="copy-outline" size={20} color="#7a0019" />
+                    <Text style={styles.duplicateButtonText}>Duplicate Request</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Tabs */}
@@ -715,11 +763,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#7a0019',
   },
-  pdfDownloadContainer: {
+  actionButtonsContainer: {
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    gap: 12,
+  },
+  pdfDownloadContainer: {
+    // Container for PDF button
+  },
+  duplicateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#7a0019',
+    backgroundColor: '#fff',
+  },
+  duplicateButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#7a0019',
   },
   requestTitle: {
     fontSize: 16,

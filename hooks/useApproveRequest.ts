@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase/client';
 import { RequestStatus } from '@/lib/types';
 import { useQueryClient } from '@tanstack/react-query';
 
-type ApprovalRole = 'head' | 'vp' | 'president' | 'hr';
+type ApprovalRole = 'head' | 'vp' | 'president' | 'hr' | 'comptroller';
 
 interface ApproveRequestParams {
   requestId: string;
@@ -13,6 +13,9 @@ interface ApproveRequestParams {
   signature: string;
   comments?: string;
   rejectionReason?: string;
+  nextApproverId?: string | null;
+  nextApproverRole?: string;
+  returnReason?: string;
 }
 
 export function useApproveRequest() {
@@ -61,6 +64,13 @@ export function useApproveRequest() {
           updateData.head_approved_by = userId;
           updateData.head_signature = signature;
           if (comments) updateData.head_comments = comments;
+          if (nextApproverId) updateData.next_approver_id = nextApproverId;
+          if (nextApproverRole) updateData.next_approver_role = nextApproverRole;
+        } else if (role === 'comptroller') {
+          updateData.comptroller_approved_at = now;
+          updateData.comptroller_approved_by = userId;
+          updateData.comptroller_signature = signature;
+          if (comments) updateData.comptroller_comments = comments;
         } else if (role === 'vp') {
           updateData.vp_approved_at = now;
           updateData.vp_approved_by = userId;
@@ -81,7 +91,7 @@ export function useApproveRequest() {
         // Get current request to determine next status
         const { data: currentRequest } = await supabase
           .from('requests')
-          .select('status, total_budget')
+          .select('status, total_budget, requester_is_head, department_id, parent_department_id')
           .eq('id', requestId)
           .single();
 
@@ -90,24 +100,41 @@ export function useApproveRequest() {
         }
 
         // Determine next status based on current status and role
-        // Match web version workflow logic
+        // Match web version workflow logic with 15k threshold for faculty
         let nextStatus: RequestStatus = currentRequest.status;
 
-        if (role === 'head' && currentRequest.status === 'pending_head') {
+        if (role === 'comptroller' && currentRequest.status === 'pending_comptroller') {
+          // After comptroller approval, go to HR
+          nextStatus = 'pending_hr';
+        } else if (role === 'head' && currentRequest.status === 'pending_head') {
           // Check if department has parent - if yes, go to parent_head, else admin
-          // For now, default to admin (parent_head logic can be added if needed)
+          if (currentRequest.parent_department_id) {
+            nextStatus = 'pending_parent_head';
+          } else {
+            nextStatus = 'pending_admin';
+          }
+        } else if (role === 'head' && currentRequest.status === 'pending_parent_head') {
+          // Parent head approval goes to admin
           nextStatus = 'pending_admin';
         } else if (role === 'vp' && currentRequest.status === 'pending_vp') {
-          // Check if budget > 50,000, then forward to president
-          if ((currentRequest.total_budget || 0) > 50000) {
+          // Updated threshold: Faculty with budget > 15k OR heads always go to President
+          const isFaculty = !currentRequest.requester_is_head;
+          const budget = currentRequest.total_budget || 0;
+          
+          if (currentRequest.requester_is_head) {
+            // Heads always go to President
+            nextStatus = 'pending_president';
+          } else if (isFaculty && budget > 15000) {
+            // Faculty with budget > 15k go to President
             nextStatus = 'pending_president';
           } else {
+            // Faculty with budget <= 15k: VP approval is sufficient
             nextStatus = 'approved';
           }
         } else if (role === 'president' && currentRequest.status === 'pending_president') {
           nextStatus = 'approved';
         } else if (role === 'hr' && currentRequest.status === 'pending_hr') {
-          // HR approval goes to VP (or exec in some cases, but VP is more common)
+          // HR approval goes to VP
           nextStatus = 'pending_vp';
         }
 
@@ -120,13 +147,14 @@ export function useApproveRequest() {
 
         if (updateError) throw updateError;
 
-        // Invalidate inbox queries to refresh the list
+        // Invalidate all relevant queries to refresh the list
         queryClient.invalidateQueries({ queryKey: ['head-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['vp-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['president-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['hr-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['comptroller-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['request-tracking'] });
+        queryClient.invalidateQueries({ queryKey: ['request-review'] });
 
         Alert.alert('Success', 'Request approved successfully');
       } else {
@@ -146,13 +174,14 @@ export function useApproveRequest() {
 
         if (updateError) throw updateError;
 
-        // Invalidate inbox queries to refresh the list
+        // Invalidate all relevant queries to refresh the list
         queryClient.invalidateQueries({ queryKey: ['head-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['vp-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['president-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['hr-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['comptroller-inbox'] });
         queryClient.invalidateQueries({ queryKey: ['request-tracking'] });
+        queryClient.invalidateQueries({ queryKey: ['request-review'] });
 
         Alert.alert('Success', 'Request rejected');
       }

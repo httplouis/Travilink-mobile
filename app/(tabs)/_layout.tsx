@@ -64,7 +64,7 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="calendar"
+          name="yearly-calendar"
           options={{
             title: 'Calendar',
             tabBarIcon: ({ color, focused }) => <CalendarIcon color={color} focused={focused} />,

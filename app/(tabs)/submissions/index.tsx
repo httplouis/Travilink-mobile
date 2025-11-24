@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,20 +15,73 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRequests } from '@/hooks/useRequests';
 import RequestCard from '@/components/RequestCard';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Request, RequestStatus } from '@/lib/types';
 import NavigationHeader from '@/components/NavigationHeader';
 import SidebarMenu from '@/components/SidebarMenu';
 
+const STATUS_OPTIONS: (RequestStatus | 'all')[] = [
+  'all',
+  'pending_head',
+  'pending_parent_head',
+  'pending_admin',
+  'pending_comptroller',
+  'pending_hr',
+  'pending_vp',
+  'pending_president',
+  'pending_exec',
+  'approved',
+  'rejected',
+];
+
 export default function SubmissionsScreen() {
+  // ALL HOOKS MUST BE CALLED FIRST - before any conditional returns
   const { profile, loading: authLoading } = useAuth();
+  const params = useLocalSearchParams<{ filter?: string }>();
   const { requests, isLoading, error, refetch } = useRequests(profile?.id || '');
   const [refreshing, setRefreshing] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
 
-  // Don't render if still loading auth or no profile
+  // Filter and search requests
+  const filteredRequests = useMemo(() => {
+    let filtered = requests;
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((req) => req.status === statusFilter);
+    }
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (req) =>
+          req.request_number.toLowerCase().includes(query) ||
+          req.title?.toLowerCase().includes(query) ||
+          req.purpose?.toLowerCase().includes(query) ||
+          req.destination.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [requests, statusFilter, searchQuery]);
+
+  // When history filter is active, show only completed requests (approved/rejected)
+  // Otherwise show all filtered requests
+  const displayRequests = useMemo(() => {
+    if (params.filter === 'history') {
+      // History view: only show completed requests (approved or rejected)
+      return filteredRequests.filter(req => req.status === 'approved' || req.status === 'rejected');
+    }
+    return filteredRequests;
+  }, [filteredRequests, params.filter]);
+
+  // Determine title based on filter
+  const screenTitle = params.filter === 'history' ? 'History' : 'My Requests';
+
+  // NOW we can do conditional returns after all hooks are called
   if (authLoading || !profile) {
     return (
       <View style={styles.centerContainer}>
@@ -55,44 +108,6 @@ export default function SubmissionsScreen() {
   const handleViewTracking = (request: Request) => {
     router.push(`/request/${request.id}?tab=tracking`);
   };
-
-  // Filter and search requests
-  const filteredRequests = useMemo(() => {
-    let filtered = requests;
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((req) => req.status === statusFilter);
-    }
-
-    // Apply search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (req) =>
-          req.request_number.toLowerCase().includes(query) ||
-          req.title?.toLowerCase().includes(query) ||
-          req.purpose?.toLowerCase().includes(query) ||
-          req.destination.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [requests, statusFilter, searchQuery]);
-
-  const statusOptions: (RequestStatus | 'all')[] = [
-    'all',
-    'pending_head',
-    'pending_parent_head',
-    'pending_admin',
-    'pending_comptroller',
-    'pending_hr',
-    'pending_vp',
-    'pending_president',
-    'pending_exec',
-    'approved',
-    'rejected',
-  ];
 
   if (isLoading && requests.length === 0) {
     return (
@@ -137,17 +152,18 @@ export default function SubmissionsScreen() {
     );
   }
 
+
   return (
     <View style={styles.container}>
       <NavigationHeader
-        title="My Requests"
+        title={screenTitle}
         onMenuPress={() => setSidebarVisible(true)}
         showNotification={true}
         showMenu={true}
       />
       <View style={styles.subHeader}>
         <Text style={styles.subHeaderText}>
-          {`${filteredRequests.length} of ${requests.length} request${requests.length !== 1 ? 's' : ''}`}
+          {`${displayRequests.length} of ${requests.length} request${requests.length !== 1 ? 's' : ''}`}
         </Text>
       </View>
 
@@ -173,7 +189,7 @@ export default function SubmissionsScreen() {
       {/* Status Filter */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          {statusOptions.map((status) => (
+          {STATUS_OPTIONS.map((status) => (
             <TouchableOpacity
               key={status}
               style={[
@@ -197,7 +213,7 @@ export default function SubmissionsScreen() {
 
       {/* Request List */}
       <FlatList
-        data={filteredRequests}
+        data={displayRequests}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <RequestCard

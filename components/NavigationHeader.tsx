@@ -82,7 +82,7 @@ export default function NavigationHeader({
         >
           <Ionicons name="notifications-outline" size={24} color="#111827" />
           {unreadCount > 0 && (
-            <View style={styles.badge}>
+            <View style={[styles.badge, unreadCount > 9 && styles.badgeLarge]}>
               <Text style={styles.badgeText}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </Text>
@@ -136,10 +136,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
+  badgeLarge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+  },
   badgeText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
+    textAlign: 'center',
   },
   profileButton: {
     padding: 2,

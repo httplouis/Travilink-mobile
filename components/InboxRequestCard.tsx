@@ -10,17 +10,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { formatDate } from '@/lib/utils';
 import ApprovalActions from './ApprovalActions';
+import StandardizedReviewModal from './StandardizedReviewModal';
+import HeadApprovalModal from './HeadApprovalModal';
 
 interface InboxRequestCardProps {
   request: Request;
-  role: 'head' | 'vp' | 'president' | 'hr';
+  role: 'head' | 'vp' | 'president' | 'hr' | 'comptroller';
+  onPress?: () => void; // Optional custom onPress handler
 }
 
-export default function InboxRequestCard({ request, role }: InboxRequestCardProps) {
+export default function InboxRequestCard({ request, role, onPress }: InboxRequestCardProps) {
   const [showActions, setShowActions] = useState(false);
 
   const handleViewDetails = () => {
-    router.push(`/request/${request.id}`);
+    if (onPress) {
+      onPress();
+    } else {
+      router.push(`/request/${request.id}`);
+    }
   };
 
   // Calculate days until travel
@@ -41,6 +48,7 @@ export default function InboxRequestCard({ request, role }: InboxRequestCardProp
 
   // Get status color based on request status
   const getStatusColor = () => {
+    if (request.status?.includes('pending_comptroller')) return '#7a0019'; // Maroon
     if (request.status?.includes('pending_head')) return '#f59e0b'; // Yellow
     if (request.status?.includes('pending_vp')) return '#3b82f6'; // Blue
     if (request.status?.includes('pending_president')) return '#8b5cf6'; // Purple
@@ -58,7 +66,7 @@ export default function InboxRequestCard({ request, role }: InboxRequestCardProp
           <View style={styles.headerLeft}>
             <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
             <View style={styles.headerTextContainer}>
-              <Text style={styles.requestNumber}>{request.request_number}</Text>
+              <Text style={styles.requestNumber}>{request.request_number || 'DRAFT'}</Text>
               <View style={styles.badgeRow}>
                 <View style={[styles.badge, { backgroundColor: statusColor + '20' }]}>
                   <Text style={[styles.badgeText, { color: statusColor }]}>
@@ -163,7 +171,14 @@ export default function InboxRequestCard({ request, role }: InboxRequestCardProp
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.approveButton}
-            onPress={() => setShowActions(true)}
+            onPress={() => {
+              // For comptroller with custom onPress, use that instead of StandardizedReviewModal
+              if (role === 'comptroller' && onPress) {
+                onPress();
+              } else {
+                setShowActions(true);
+              }
+            }}
           >
             <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
             <Text style={styles.approveButtonText}>Review</Text>
@@ -172,15 +187,40 @@ export default function InboxRequestCard({ request, role }: InboxRequestCardProp
       </View>
 
       {showActions && (
-        <ApprovalActions
-          requestId={request.id}
-          role={role}
-          onClose={() => setShowActions(false)}
-          onSuccess={() => {
-            setShowActions(false);
-            // Query invalidation in useApproveRequest will trigger refresh
-          }}
-        />
+        role === 'head' ? (
+          <HeadApprovalModal
+            visible={showActions}
+            request={request}
+            onClose={() => setShowActions(false)}
+            isHistory={request.status !== 'pending_head' && request.status !== 'pending_parent_head'}
+          />
+        ) : role === 'hr' || role === 'vp' || role === 'president' ? (
+          <StandardizedReviewModal
+            requestId={request.id}
+            role={role}
+            onClose={() => setShowActions(false)}
+            onSuccess={() => {
+              setShowActions(false);
+              // Query invalidation in useApproveRequest will trigger refresh
+            }}
+            canReturnToSender={true}
+          />
+        ) : role === 'comptroller' ? (
+          // Comptroller should use BudgetReviewModal, not StandardizedReviewModal
+          // This should only show if onPress wasn't provided (fallback)
+          null
+        ) : (
+          <ApprovalActions
+            requestId={request.id}
+            role={role}
+            onClose={() => setShowActions(false)}
+            onSuccess={() => {
+              setShowActions(false);
+              // Query invalidation in useApproveRequest will trigger refresh
+            }}
+            canReturnToSender={true}
+          />
+        )
       )}
     </TouchableOpacity>
   );
@@ -192,30 +232,30 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardUrgent: {
-    borderColor: '#f59e0b',
-    borderWidth: 2,
+    borderColor: '#fbbf24',
+    borderWidth: 1,
   },
   cardOverdue: {
-    borderColor: '#dc2626',
-    borderWidth: 2,
+    borderColor: '#f87171',
+    borderWidth: 1,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    paddingBottom: 12,
+    padding: 14,
+    paddingBottom: 10,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -224,8 +264,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statusIndicator: {
-    width: 4,
-    height: 40,
+    width: 3,
+    height: 36,
     borderRadius: 2,
   },
   headerTextContainer: {
@@ -259,31 +299,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   urgentBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.3,
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#92400e',
+    letterSpacing: 0.2,
   },
   overdueBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   overdueBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.3,
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#991b1b',
+    letterSpacing: 0.2,
   },
   cardContent: {
     padding: 16,

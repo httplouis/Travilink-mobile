@@ -7,19 +7,36 @@ export function useHeadInbox(headId: string, departmentId: string | null) {
     queryKey: ['head-inbox', headId, departmentId],
     queryFn: async (): Promise<Request[]> => {
       if (!headId || !departmentId) {
-        console.log('[useHeadInbox] Missing headId or departmentId:', { headId, departmentId });
+        if (__DEV__) {
+          console.log('[useHeadInbox] Missing headId or departmentId:', { headId, departmentId });
+        }
         return [];
       }
 
-      console.log('[useHeadInbox] Fetching inbox for head:', headId, 'department:', departmentId);
+      // Validate departmentId is a valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(departmentId)) {
+        if (__DEV__) {
+          console.warn('[useHeadInbox] Invalid departmentId format (not a UUID):', departmentId);
+        }
+        return [];
+      }
+
+      if (__DEV__) {
+        console.log('[useHeadInbox] Fetching inbox for head:', headId, 'department:', departmentId);
+      }
 
       // Verify authentication
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.error('[useHeadInbox] No active session - user not authenticated');
+        if (__DEV__) {
+          console.error('[useHeadInbox] No active session - user not authenticated');
+        }
         throw new Error('User not authenticated');
       }
-      console.log('[useHeadInbox] User authenticated:', session.user.email);
+      if (__DEV__) {
+        console.log('[useHeadInbox] User authenticated:', session.user.email);
+      }
 
       // Create AbortController for request cancellation
       const abortController = new AbortController();
@@ -50,14 +67,28 @@ export function useHeadInbox(headId: string, departmentId: string | null) {
         if (headError) {
           // Don't throw on abort errors - just return empty array
           if (headError.message?.includes('Aborted') || headError.message?.includes('abort')) {
-            console.log('[useHeadInbox] Request aborted (likely component unmounted)');
+            if (__DEV__) {
+              console.log('[useHeadInbox] Request aborted (likely component unmounted)');
+            }
             return [];
           }
-          console.error('[useHeadInbox] Error fetching pending_head requests:', headError);
-          throw headError;
+          // Log detailed error information only if meaningful
+          if (__DEV__ && (headError.code || headError.message)) {
+            console.error('[useHeadInbox] Error fetching pending_head requests:', {
+              code: headError.code,
+              message: headError.message,
+              details: headError.details,
+              hint: headError.hint,
+            });
+          }
+          // Don't throw - return empty array to prevent UI crashes
+          // The error will still be available in the hook's error state
+          return [];
         }
 
-        console.log('[useHeadInbox] Found', pendingHeadRequests?.length || 0, 'pending_head requests');
+        if (__DEV__) {
+          console.log('[useHeadInbox] Found', pendingHeadRequests?.length || 0, 'pending_head requests');
+        }
 
         // Then, get requests with pending_parent_head status where parent_department_id matches head's department
         const { data: pendingParentHeadRequests, error: parentHeadError } = await supabase
@@ -76,14 +107,27 @@ export function useHeadInbox(headId: string, departmentId: string | null) {
         if (parentHeadError) {
           // Don't throw on abort errors - just return empty array
           if (parentHeadError.message?.includes('Aborted') || parentHeadError.message?.includes('abort')) {
-            console.log('[useHeadInbox] Request aborted (likely component unmounted)');
+            if (__DEV__) {
+              console.log('[useHeadInbox] Request aborted (likely component unmounted)');
+            }
             return [];
           }
-          console.error('[useHeadInbox] Error fetching pending_parent_head requests:', parentHeadError);
-          throw parentHeadError;
+          // Log detailed error information
+          if (__DEV__) {
+            console.error('[useHeadInbox] Error fetching pending_parent_head requests:', {
+              code: parentHeadError.code,
+              message: parentHeadError.message,
+              details: parentHeadError.details,
+              hint: parentHeadError.hint,
+            });
+          }
+          // Don't throw - return empty array to prevent UI crashes
+          return [];
         }
 
-        console.log('[useHeadInbox] Found', pendingParentHeadRequests?.length || 0, 'pending_parent_head requests');
+        if (__DEV__) {
+          console.log('[useHeadInbox] Found', pendingParentHeadRequests?.length || 0, 'pending_parent_head requests');
+        }
 
         // Combine both results
         const requests = [
@@ -96,9 +140,11 @@ export function useHeadInbox(headId: string, departmentId: string | null) {
           return dateB - dateA;
         }).slice(0, 50); // Limit to 50 total
 
-        console.log('[useHeadInbox] Returning', requests.length, 'total requests');
-        if (requests.length > 0) {
-          console.log('[useHeadInbox] Sample request numbers:', requests.slice(0, 3).map(r => r.request_number));
+        if (__DEV__) {
+          console.log('[useHeadInbox] Returning', requests.length, 'total requests');
+          if (requests.length > 0) {
+            console.log('[useHeadInbox] Sample request numbers:', requests.slice(0, 3).map(r => r.request_number));
+          }
         }
 
         clearTimeout(timeoutId);
@@ -107,10 +153,16 @@ export function useHeadInbox(headId: string, departmentId: string | null) {
         clearTimeout(timeoutId);
         // Handle abort errors gracefully
         if (err?.message?.includes('Aborted') || err?.message?.includes('abort') || err?.name === 'AbortError') {
-          console.log('[useHeadInbox] Request was aborted');
+          if (__DEV__) {
+            console.log('[useHeadInbox] Request was aborted');
+          }
           return [];
         }
-        throw err;
+        // Log error but don't throw - return empty array to prevent UI crashes
+        if (__DEV__) {
+          console.error('[useHeadInbox] Unexpected error:', err);
+        }
+        return [];
       }
     },
     enabled: !!headId && !!departmentId,

@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 export function useSignatureSettings() {
   const { profile } = useAuth();
   const [signature, setSignature] = useState<string | null>(null);
+  const [autoSignature, setAutoSignature] = useState<string | null>(null);
+  const [isAutoSignEnabled, setIsAutoSignEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -15,12 +17,14 @@ export function useSignatureSettings() {
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('signature_url')
+          .select('signature_url, automatic_signature, is_auto_sign_enabled')
           .eq('id', profile.id)
           .single();
 
         if (error) throw error;
         setSignature(data?.signature_url || null);
+        setAutoSignature(data?.automatic_signature || null);
+        setIsAutoSignEnabled(data?.is_auto_sign_enabled || false);
       } catch (error) {
         console.error('Error fetching signature:', error);
       } finally {
@@ -82,6 +86,8 @@ export function useSignatureSettings() {
 
   return {
     signature,
+    autoSignature,
+    isAutoSignEnabled,
     loading,
     saving,
     saveSignature,

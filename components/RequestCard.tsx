@@ -33,7 +33,7 @@ export default function RequestCard({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.requestNumber}>{request.request_number}</Text>
+          <Text style={styles.requestNumber}>{request.request_number || 'DRAFT'}</Text>
           <StatusBadge status={request.status} size="sm" />
           {needsFeedback && (
             <View style={styles.feedbackBadge}>
@@ -119,7 +119,7 @@ export default function RequestCard({
             <Text style={styles.actionText}>View Details</Text>
           </TouchableOpacity>
         )}
-        {onViewTracking && (
+        {onViewTracking && request.status !== 'draft' && (
           <TouchableOpacity
             style={styles.actionButton}
             onPress={(e) => {

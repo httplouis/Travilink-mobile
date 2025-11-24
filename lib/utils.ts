@@ -121,3 +121,15 @@ export function formatCurrency(amount: number | null | undefined): string {
   }).format(amount);
 }
 
+/**
+ * Check if user is comptroller based on email
+ */
+export function isComptroller(email: string | null | undefined): boolean {
+  if (!email) return false;
+  // Comptroller emails typically contain 'comptroller' or specific domain
+  const emailLower = email.toLowerCase();
+  return emailLower.includes('comptroller') || 
+         emailLower.includes('accounting') ||
+         emailLower === 'comptroller@emiliouniversity.edu.ph';
+}
+

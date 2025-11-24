@@ -80,12 +80,27 @@ export default function RequestStatusTracker({
   rejectionStage,
   compact = false,
 }: RequestStatusTrackerProps) {
-  // Filter stages based on workflow
-  const activeStages = STAGES.filter(stage => {
-    if (stage.key === 'head' && requesterIsHead) return false;
-    if (stage.key === 'parent_head' && !hasParentHead) return false;
-    if (stage.key === 'comptroller' && !hasBudget) return false;
-    if (stage.key === 'president' && !requiresPresidentApproval) return false;
+  // Filter stages based on workflow - but keep skipped stages to show them
+  const allStages = STAGES.map(stage => {
+    // Check if this stage should be skipped
+    let skipInfo = { skipped: false, reason: undefined as string | undefined };
+    
+    if (stage.key === 'head' && requesterIsHead) {
+      skipInfo = { skipped: true, reason: 'Requester is department head' };
+    } else if (stage.key === 'parent_head' && !hasParentHead) {
+      skipInfo = { skipped: true, reason: 'No parent department' };
+    } else if (stage.key === 'comptroller' && !hasBudget) {
+      skipInfo = { skipped: true, reason: 'No budget requested' };
+    } else if (stage.key === 'president' && !requiresPresidentApproval) {
+      skipInfo = { skipped: true, reason: 'Budget below threshold' };
+    }
+    
+    return { ...stage, skipInfo };
+  });
+
+  // Show all stages, but mark skipped ones
+  const activeStages = allStages.filter(stage => {
+    // Always show all stages, even if skipped, so users can see the full workflow
     return true;
   });
 
@@ -153,6 +168,20 @@ export default function RequestStatusTracker({
       default: return null;
     }
   };
+
+  const getApprovalTimestamp = (stageKey: string): string | null | undefined => {
+    switch (stageKey) {
+      case 'head': return headApprovedAt;
+      case 'parent_head': return parentHeadApprovedAt;
+      case 'admin': return adminProcessedAt;
+      case 'comptroller': return comptrollerApprovedAt;
+      case 'hr': return hrApprovedAt;
+      case 'vp': return vpApprovedAt || execApprovedAt;
+      case 'president': return presidentApprovedAt || execApprovedAt;
+      default: return null;
+    }
+  };
+
 
   if (compact) {
     return (
@@ -231,6 +260,8 @@ export default function RequestStatusTracker({
           const stageStatus = getStageStatus(stage.key);
           const approverName = getApproverName(stage.key);
           const isLast = idx === activeStages.length - 1;
+          const skipInfo = (stage as any).skipInfo || { skipped: false };
+          const isSkipped = skipInfo.skipped && stageStatus === 'pending';
           
           return (
             <View key={stage.key} style={styles.timelineItem}>
@@ -241,6 +272,7 @@ export default function RequestStatusTracker({
                     stageStatus === 'completed' && styles.timelineIconCompleted,
                     stageStatus === 'current' && styles.timelineIconCurrent,
                     stageStatus === 'rejected' && styles.timelineIconRejected,
+                    isSkipped && styles.timelineIconSkipped,
                   ]}
                 >
                   {stageStatus === 'completed' && (
@@ -252,7 +284,10 @@ export default function RequestStatusTracker({
                   {stageStatus === 'rejected' && (
                     <Ionicons name="close" size={20} color="#fff" />
                   )}
-                  {stageStatus === 'pending' && (
+                  {isSkipped && (
+                    <Ionicons name="remove" size={20} color="#6b7280" />
+                  )}
+                  {stageStatus === 'pending' && !isSkipped && (
                     <Ionicons name={stage.icon} size={20} color="#999" />
                   )}
                 </View>
@@ -261,6 +296,7 @@ export default function RequestStatusTracker({
                     style={[
                       styles.timelineConnector,
                       stageStatus === 'completed' && styles.timelineConnectorCompleted,
+                      isSkipped && styles.timelineConnectorSkipped,
                     ]}
                   />
                 )}
@@ -269,16 +305,31 @@ export default function RequestStatusTracker({
               <View style={styles.timelineContent}>
                 <View style={styles.timelineHeader}>
                   <View style={styles.timelineHeaderLeft}>
-                    <Text
-                      style={[
-                        styles.timelineLabel,
-                        stageStatus === 'current' && styles.timelineLabelCurrent,
-                        stageStatus === 'completed' && styles.timelineLabelCompleted,
-                      ]}
-                    >
-                      {stage.label}
+                    <View style={styles.timelineLabelRow}>
+                      <Text
+                        style={[
+                          styles.timelineLabel,
+                          stageStatus === 'current' && styles.timelineLabelCurrent,
+                          stageStatus === 'completed' && styles.timelineLabelCompleted,
+                          isSkipped && styles.timelineLabelSkipped,
+                        ]}
+                      >
+                        {stage.label}
+                      </Text>
+                      {isSkipped && (
+                        <View style={styles.skippedBadge}>
+                          <Text style={styles.skippedBadgeText}>Skipped</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.timelineRole, isSkipped && styles.timelineRoleSkipped]}>
+                      {stage.role}
                     </Text>
-                    <Text style={styles.timelineRole}>{stage.role}</Text>
+                    {isSkipped && skipInfo.reason && (
+                      <Text style={styles.skippedReason}>
+                        {skipInfo.reason}
+                      </Text>
+                    )}
                     {stageStatus === 'completed' && approverName && (
                       <Text style={styles.timelineApproverName}>
                         Approved by {approverName}
@@ -303,7 +354,7 @@ export default function RequestStatusTracker({
                     </View>
                   )}
                   
-                  {stageStatus === 'pending' && (
+                  {stageStatus === 'pending' && !isSkipped && (
                     <View style={styles.waitingBadge}>
                       <Text style={styles.waitingText}>Waiting</Text>
                     </View>
@@ -326,14 +377,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
+    gap: 4,
   },
   compactIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#e5e7eb',
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 2,
   },
   compactIconCompleted: {
     backgroundColor: '#16a34a',
@@ -345,10 +398,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#dc2626',
   },
   compactConnector: {
-    width: 32,
+    width: 24,
     height: 2,
     backgroundColor: '#e5e7eb',
-    marginHorizontal: 4,
+    marginHorizontal: 2,
   },
   compactConnectorCompleted: {
     backgroundColor: '#16a34a',
@@ -441,11 +494,13 @@ const styles = StyleSheet.create({
   timelineContent: {
     flex: 1,
     paddingTop: 4,
+    minHeight: 60, // Ensure minimum height to prevent overlap
   },
   timelineHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 8,
   },
   timelineLabel: {
     fontSize: 16,
@@ -467,9 +522,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   timelineApproverName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#111827',
+    marginTop: 4,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+    flex: 1,
+  },
+  timelineApprovalTime: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+    marginBottom: 4,
   },
   currentBadge: {
     backgroundColor: '#dbeafe',
@@ -489,6 +554,49 @@ const styles = StyleSheet.create({
   waitingText: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  timelineIconSkipped: {
+    backgroundColor: '#f3f4f6',
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderStyle: 'dashed',
+  },
+  timelineConnectorSkipped: {
+    backgroundColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  timelineLabelSkipped: {
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  timelineRoleSkipped: {
+    color: '#9ca3af',
+  },
+  timelineLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  skippedBadge: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  skippedBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+  },
+  skippedReason: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
 });
 

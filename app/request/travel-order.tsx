@@ -12,16 +12,21 @@ import {
   TextInput as RNTextInput,
   Keyboard,
   TouchableWithoutFeedback,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUsers } from '@/hooks/useUsers';
+import { useDrivers } from '@/hooks/useDrivers';
+import { useVehicles } from '@/hooks/useVehicles';
 import { supabase } from '@/lib/supabase/client';
 import NavigationHeader from '@/components/NavigationHeader';
 import CustomTabBar from '@/components/CustomTabBar';
 import DateInput from '@/components/DateInput';
 import UserSearchableSelect from '@/components/UserSearchableSelect';
+import HeadSearchableSelect from '@/components/HeadSearchableSelect';
+import VehicleDriverSelection from '@/components/VehicleDriverSelection';
 import DepartmentSelect from '@/components/DepartmentSelect';
 import LocationField from '@/components/LocationField';
 import CostsSection from '@/components/CostsSection';
@@ -31,6 +36,7 @@ import FileAttachmentPicker, { AttachmentFile } from '@/components/FileAttachmen
 import PickupPreferenceSelector, { PickupPreference } from '@/components/PickupPreferenceSelector';
 import ValidationSummary from '@/components/ValidationSummary';
 import { uploadFilesToStorage } from '@/lib/storage';
+import { WorkflowEngine } from '@/lib/workflow';
 
 // Types matching web exactly
 interface TravelCosts {
@@ -66,6 +72,102 @@ interface TravelOrderData {
   endorsedByHeadSignature?: string;
   requesterContactNumber?: string;
   pickupPreference?: PickupPreference;
+  vehicleMode?: 'owned' | 'institutional' | 'rent';
+  preferredVehicleId?: string | null;
+  preferredDriverId?: string | null;
+}
+
+// Preferred Vehicle & Driver Section Component
+function PreferredVehicleDriverSection({
+  preferredVehicleId,
+  preferredDriverId,
+  onVehicleChange,
+  onDriverChange,
+}: {
+  preferredVehicleId: string | null | undefined;
+  preferredDriverId: string | null | undefined;
+  onVehicleChange: (vehicleId: string | null) => void;
+  onDriverChange: (driverId: string | null) => void;
+}) {
+  const { vehicles, isLoading: vehiclesLoading } = useVehicles({ available: true });
+  const { data: drivers, isLoading: driversLoading } = useDrivers({ status: 'active' });
+  const [vehicleModalVisible, setVehicleModalVisible] = useState(false);
+  const [driverModalVisible, setDriverModalVisible] = useState(false);
+
+  const selectedVehicle = vehicles?.find(v => v.id === preferredVehicleId);
+  const selectedDriver = drivers?.find(d => d.id === preferredDriverId);
+
+  return (
+    <>
+      <View style={styles.preferredSection}>
+        <View style={styles.row}>
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>Preferred Driver (Optional)</Text>
+            {driversLoading ? (
+              <ActivityIndicator size="small" color="#7A0010" style={{ marginTop: 8 }} />
+            ) : (
+              <View style={styles.selectContainer}>
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={() => setDriverModalVisible(true)}
+                >
+                  <Text style={styles.selectButtonText}>
+                    {selectedDriver?.name || 'Select driver...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>Preferred Vehicle (Optional)</Text>
+            {vehiclesLoading ? (
+              <ActivityIndicator size="small" color="#7A0010" style={{ marginTop: 8 }} />
+            ) : (
+              <View style={styles.selectContainer}>
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={() => setVehicleModalVisible(true)}
+                >
+                  <Text style={styles.selectButtonText}>
+                    {selectedVehicle
+                      ? `${selectedVehicle.vehicle_name} • ${selectedVehicle.plate_number}`
+                      : 'Select vehicle...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Vehicle Selection Modal */}
+      <VehicleDriverSelection
+        visible={vehicleModalVisible}
+        onClose={() => setVehicleModalVisible(false)}
+        type="vehicle"
+        selectedId={preferredVehicleId || null}
+        onSelect={(id) => {
+          onVehicleChange(id);
+          setVehicleModalVisible(false);
+        }}
+      />
+
+      {/* Driver Selection Modal */}
+      <VehicleDriverSelection
+        visible={driverModalVisible}
+        onClose={() => setDriverModalVisible(false)}
+        type="driver"
+        selectedId={preferredDriverId || null}
+        onSelect={(id) => {
+          onDriverChange(id);
+          setDriverModalVisible(false);
+        }}
+      />
+    </>
+  );
 }
 
 export default function TravelOrderScreen() {
@@ -78,6 +180,7 @@ export default function TravelOrderScreen() {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const fieldRefs = useRef<Record<string, View | null>>({});
+  const errorAnimations = useRef<Record<string, Animated.Value>>({});
   
   // Requesting person tracking
   const [requestingPersonIsHead, setRequestingPersonIsHead] = useState<boolean | null>(null);
@@ -95,13 +198,19 @@ export default function TravelOrderScreen() {
     departureDate: '',
     returnDate: '',
     purposeOfTravel: '',
-    costs: {},
+    costs: {
+      food: 1000, // Prefilled default
+      driversAllowance: 500, // Prefilled default
+    },
     requesterSignature: '',
     endorsedByHeadName: '',
     endorsedByHeadDate: '',
     endorsedByHeadSignature: '',
     requesterContactNumber: '',
     pickupPreference: null,
+    vehicleMode: 'owned',
+    preferredVehicleId: null,
+    preferredDriverId: null,
   });
 
   // Pre-fill requesting person with current user on mount
@@ -110,6 +219,8 @@ export default function TravelOrderScreen() {
       setFormData(prev => ({ ...prev, requestingPerson: profile.name }));
     }
   }, [profile]);
+
+  // Auto-fill removed - form starts empty
 
   // Check if requesting person is different from current user (representative submission)
   useEffect(() => {
@@ -258,6 +369,35 @@ export default function TravelOrderScreen() {
     }
   };
 
+  // Get next approver text based on routing logic
+  const getNextApproverText = (): string => {
+    if (isRepresentativeSubmission && formData.requestingPerson) {
+      return `Send to ${formData.requestingPerson}`;
+    }
+    
+    const requesterIsHead = requestingPersonIsHead ?? false;
+    // For head users, just show "Forward" with suggestions
+    if (requesterIsHead) {
+      return 'Forward';
+    }
+    
+    const vehicleMode = formData.vehicleMode || 'owned';
+    return `Forward to ${WorkflowEngine.getFirstReceiver(requesterIsHead, vehicleMode as 'owned' | 'institutional' | 'rent')}`;
+  };
+
+  // Get routing suggestion text
+  const getRoutingSuggestion = (): string | null => {
+    const hasBudget = (formData.costs?.food || 0) + 
+                     (formData.costs?.driversAllowance || 0) + 
+                     (formData.costs?.rentVehicles || 0) + 
+                     (formData.costs?.hiredDrivers || 0) + 
+                     (formData.costs?.accommodation || 0) > 0;
+    const needsVehicle = formData.vehicleMode === 'institutional' || formData.vehicleMode === 'rent';
+    const requesterIsHead = requestingPersonIsHead ?? false;
+    
+    return WorkflowEngine.getRoutingSuggestion(hasBudget, needsVehicle, requesterIsHead);
+  };
+
   // Validation matching web exactly
   const validateForm = (): { ok: boolean; errors: Record<string, string> } => {
     const newErrors: Record<string, string> = {};
@@ -321,6 +461,11 @@ export default function TravelOrderScreen() {
       newErrors['travelOrder.purposeOfTravel'] = 'Purpose of travel is required';
     }
 
+    // Validate vehicle mode
+    if (!formData.vehicleMode) {
+      newErrors['travelOrder.vehicleMode'] = 'Vehicle mode is required';
+    }
+
     // Signature validation (skip if representative submission)
     const hasSignature = formData.requesterSignature && 
       formData.requesterSignature.startsWith('data:image') && 
@@ -360,8 +505,21 @@ export default function TravelOrderScreen() {
       newErrors['travelOrder.costs.justification'] = 'Please provide a justification for renting / hiring.';
     }
 
-    // Contact number validation (if provided, must be valid format)
-    if (formData.requesterContactNumber && formData.requesterContactNumber.trim()) {
+    // Contact number validation - REQUIRED for institutional vehicle, optional otherwise
+    if (formData.vehicleMode === 'institutional') {
+      if (!formData.requesterContactNumber || !formData.requesterContactNumber.trim()) {
+        newErrors['travelOrder.requesterContactNumber'] = 'Contact number is required for institutional vehicle requests';
+      } else {
+        const phone = formData.requesterContactNumber.trim();
+        const philippinesPhoneRegex = /^(\+63|0)?9\d{9}$/;
+        const cleanPhone = phone.replace(/[\s-]/g, '');
+        
+        if (!philippinesPhoneRegex.test(cleanPhone) && !cleanPhone.startsWith('+63') && !cleanPhone.startsWith('09')) {
+          newErrors['travelOrder.requesterContactNumber'] = 'Please enter a valid Philippines phone number (+63XXXXXXXXXX or 09XXXXXXXXX)';
+        }
+      }
+    } else if (formData.requesterContactNumber && formData.requesterContactNumber.trim()) {
+      // Optional validation if provided for owned/rent
       const phone = formData.requesterContactNumber.trim();
       const philippinesPhoneRegex = /^(\+63|0)?9\d{9}$/;
       const cleanPhone = phone.replace(/[\s-]/g, '');
@@ -372,6 +530,29 @@ export default function TravelOrderScreen() {
     }
 
     setErrors(newErrors);
+    
+    // Animate error fields
+    Object.keys(newErrors).forEach((errorKey) => {
+      if (!errorAnimations.current[errorKey]) {
+        errorAnimations.current[errorKey] = new Animated.Value(0);
+      }
+      // Start pulsing animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(errorAnimations.current[errorKey], {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(errorAnimations.current[errorKey], {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    });
+    
     return { ok: Object.keys(newErrors).length === 0, errors: newErrors };
   };
 
@@ -483,23 +664,18 @@ export default function TravelOrderScreen() {
 
       // Determine initial status using workflow engine logic
       const requesterIsHead = requestingPersonIsHead ?? false;
+      const vehicleMode = formData.vehicleMode || 'owned';
       let initialStatus: string;
       
       if (status === 'draft') {
         initialStatus = 'draft';
-      } else if (isRepresentativeSubmission && formData.requestingPerson) {
-        // Representative submission: send to requesting person first for signature
-        if (requesterIsHead) {
-          initialStatus = 'pending_head'; // Requesting person is head, they can approve directly
-        } else {
-          initialStatus = 'pending_requester_signature'; // Need requesting person's signature first
-        }
-      } else if (requesterIsHead) {
-        // Requesting person is a head, can go directly to admin
-        initialStatus = 'pending_admin';
       } else {
-        // Requesting person is NOT a head, send to their department head first
-        initialStatus = 'pending_head';
+        initialStatus = WorkflowEngine.getInitialStatus(
+          requesterIsHead,
+          vehicleMode,
+          hasBudget,
+          isRepresentativeSubmission
+        );
       }
 
       // Upload attachments if any
@@ -523,8 +699,10 @@ export default function TravelOrderScreen() {
       }
 
       // Build request data matching web API exactly
+      // Note: request_number is NOT set - let the database trigger generate it
       const requestData: any = {
         request_type: 'travel_order',
+        request_number: null, // Explicitly set to null to trigger auto-generation
         title: formData.purposeOfTravel || 'Travel Request',
         purpose: formData.purposeOfTravel || 'Travel Request',
         destination: formData.destination || 'TBD',
@@ -544,8 +722,10 @@ export default function TravelOrderScreen() {
         total_budget: totalBudget,
         expense_breakdown: expenseBreakdown,
         cost_justification: costs.justification || null,
-        vehicle_mode: 'owned', // Default for now
-        needs_vehicle: false, // Default for now
+        vehicle_mode: formData.vehicleMode || 'owned',
+        needs_vehicle: formData.vehicleMode === 'institutional' || formData.vehicleMode === 'rent',
+        preferred_vehicle_id: formData.preferredVehicleId || null,
+        preferred_driver_id: formData.preferredDriverId || null,
         status: initialStatus,
         current_approver_role: 
           initialStatus === 'pending_head' || initialStatus === 'pending_requester_signature' ? 'head' :
@@ -558,16 +738,40 @@ export default function TravelOrderScreen() {
         attachments: uploadedAttachments.length > 0 ? uploadedAttachments : null,
       };
 
-      // Insert request
-      const { data: request, error } = await supabase
-        .from('requests')
-        .insert(requestData)
-        .select()
-        .single();
+      // Insert request with retry logic to handle race conditions
+      const maxRetries = 5;
+      let request: any = null;
+      let insertError: any = null;
 
-      if (error) {
-        console.error('Request submission error:', error);
-        throw error;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const { data, error } = await supabase
+          .from('requests')
+          .insert(requestData)
+          .select()
+          .single();
+
+        if (!error) {
+          request = data;
+          insertError = null;
+          break;
+        }
+
+        // If it's a duplicate key error and we have retries left, wait and retry
+        if (error.code === '23505' && attempt < maxRetries) {
+          console.warn(`🔄 Duplicate request number on attempt ${attempt}, retrying...`);
+          // Wait with exponential backoff: 100ms, 200ms, 400ms, 800ms
+          await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+          continue;
+        }
+
+        // For other errors or final attempt, break and throw
+        insertError = error;
+        break;
+      }
+
+      if (insertError || !request) {
+        console.error('Request submission error:', insertError);
+        throw insertError || new Error('Failed to create request after retries');
       }
 
       // Create history entry
@@ -622,11 +826,65 @@ export default function TravelOrderScreen() {
         ]
       );
     } catch (error: any) {
-      console.error('Error submitting request:', error);
+      // Log error details without triggering Expo's error overlay
+      const errorDetails = {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      };
+      console.warn('Request submission error:', errorDetails);
+      
+      // Handle specific error types with empathetic messages
+      let errorMessage = 'We encountered an issue while submitting your request.';
+      let errorTitle = 'Submission Failed';
+      let showRetry = false;
+      
+      if (error.code === '23505') {
+        // Duplicate key error (likely request_number) - should be rare now with retry logic
+        errorTitle = 'Submission Conflict';
+        errorMessage = 'We encountered a conflict while creating your request. This usually happens when multiple requests are submitted at the same time.';
+        showRetry = true;
+      } else if (error.code === '23503') {
+        // Foreign key constraint
+        errorTitle = 'Invalid Information';
+        errorMessage = 'Some of the information provided is not valid. Please check your selections and try again.';
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorTitle = 'Connection Error';
+        errorMessage = 'We couldn\'t connect to the server. Please check your internet connection and try again.';
+        showRetry = true;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Show error with retry option if applicable
       Alert.alert(
-        'Submission Failed',
-        error.message || 'An error occurred while submitting your request. Please try again.'
+        errorTitle,
+        errorMessage,
+        showRetry
+          ? [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Retry', 
+                style: 'default',
+                onPress: () => {
+                  // Retry submission after a short delay
+                  setTimeout(() => {
+                    handleSubmit(status);
+                  }, 500);
+                }
+              }
+            ]
+          : [{ text: 'OK', style: 'default' }]
       );
+      
+      // Scroll to first error field if validation errors exist
+      if (Object.keys(errors).length > 0) {
+        const firstErrorKey = Object.keys(errors)[0];
+        // Trigger scroll to error field
+        setTimeout(() => {
+          // This will be handled by the validation summary modal
+        }, 100);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -671,6 +929,7 @@ export default function TravelOrderScreen() {
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled={true}
           scrollEnabled={scrollEnabled}
+          bounces={false}
         >
           {/* Form Container */}
           <View style={styles.formContainer}>
@@ -708,7 +967,7 @@ export default function TravelOrderScreen() {
                   }
                 }}
               >
-                <Ionicons name="person-add" size={16} color="#7a0019" />
+                <Ionicons name="person-add" size={16} color="#7A0010" />
                 <Text style={styles.fillCurrentButtonText}>Fill Current</Text>
               </TouchableOpacity>
             </View>
@@ -763,80 +1022,104 @@ export default function TravelOrderScreen() {
                   required
                   error={errors['travelOrder.destination']}
                   inputId="to-destination"
-                  showMapPreview={false}
+                  showMapPreview={true}
                 />
               </View>
 
-              {/* Map Preview - Full Width, Separate Section */}
-              {formData.destinationGeo?.lat != null && formData.destinationGeo?.lng != null && (
-                <View style={styles.fullWidth}>
-                  <View style={styles.mapPreviewSection}>
-                    <Text style={styles.mapPreviewLabel}>📍 Selected Location</Text>
-                    {(() => {
-                      let WebView: any = null;
-                      if (Platform.OS !== 'web') {
-                        try {
-                          WebView = require('react-native-webview').WebView;
-                        } catch (error) {
-                          console.warn('react-native-webview not available');
-                        }
-                      }
+              {/* Vehicle Mode Selection */}
+              <View style={styles.fullWidth}>
+                <Text style={styles.label}>
+                  Vehicle Mode <Text style={styles.required}>*</Text>
+                </Text>
+                <Text style={styles.helperText}>
+                  Select how you will travel to your destination
+                </Text>
+                <View style={styles.vehicleModeContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.vehicleModeOption,
+                      formData.vehicleMode === 'owned' && styles.vehicleModeOptionActive,
+                    ]}
+                    onPress={() => handleTravelOrderChange({ vehicleMode: 'owned' })}
+                  >
+                    <Ionicons
+                      name="car-outline"
+                      size={24}
+                      color={formData.vehicleMode === 'owned' ? '#7A0010' : '#6b7280'}
+                    />
+                    <Text
+                      style={[
+                        styles.vehicleModeText,
+                        formData.vehicleMode === 'owned' && styles.vehicleModeTextActive,
+                      ]}
+                    >
+                      Owned Vehicle
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.vehicleModeOption,
+                      formData.vehicleMode === 'institutional' && styles.vehicleModeOptionActive,
+                    ]}
+                    onPress={() => handleTravelOrderChange({ vehicleMode: 'institutional' })}
+                  >
+                    <Ionicons
+                      name="school-outline"
+                      size={24}
+                      color={formData.vehicleMode === 'institutional' ? '#7A0010' : '#6b7280'}
+                    />
+                    <Text
+                      style={[
+                        styles.vehicleModeText,
+                        formData.vehicleMode === 'institutional' && styles.vehicleModeTextActive,
+                      ]}
+                    >
+                      Institutional
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.vehicleModeOption,
+                      formData.vehicleMode === 'rent' && styles.vehicleModeOptionActive,
+                    ]}
+                    onPress={() => handleTravelOrderChange({ vehicleMode: 'rent' })}
+                  >
+                    <Ionicons
+                      name="car-sport-outline"
+                      size={24}
+                      color={formData.vehicleMode === 'rent' ? '#7A0010' : '#6b7280'}
+                    />
+                    <Text
+                      style={[
+                        styles.vehicleModeText,
+                        formData.vehicleMode === 'rent' && styles.vehicleModeTextActive,
+                      ]}
+                    >
+                      Rent Vehicle
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {errors['travelOrder.vehicleMode'] && (
+                  <Text style={styles.errorText}>{errors['travelOrder.vehicleMode']}</Text>
+                )}
+              </View>
 
-                      const htmlContent = `
-                        <!DOCTYPE html>
-                        <html>
-                          <head>
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-                            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-                            <style>
-                              * { margin: 0; padding: 0; box-sizing: border-box; }
-                              body, html { width: 100%; height: 100%; overflow: hidden; }
-                              #map { width: 100%; height: 100%; }
-                            </style>
-                          </head>
-                          <body>
-                            <div id="map"></div>
-                            <script>
-                              const map = L.map('map').setView([${formData.destinationGeo.lat}, ${formData.destinationGeo.lng}], 15);
-                              L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                                attribution: '© OpenStreetMap contributors',
-                                maxZoom: 19
-                              }).addTo(map);
-                              L.marker([${formData.destinationGeo.lat}, ${formData.destinationGeo.lng}]).addTo(map)
-                                .bindPopup('${(formData.destination || 'Selected location').replace(/'/g, "\\'")}')
-                                .openPopup();
-                            </script>
-                          </body>
-                        </html>
-                      `;
-
-                      return (
-                        <View style={styles.mapPreview}>
-                          {Platform.OS !== 'web' && WebView ? (
-                            <WebView
-                              style={styles.mapPreviewMap}
-                              source={{ html: htmlContent }}
-                              javaScriptEnabled={true}
-                              domStorageEnabled={true}
-                              scrollEnabled={false}
-                              showsHorizontalScrollIndicator={false}
-                              showsVerticalScrollIndicator={false}
-                            />
-                          ) : (
-                            <View style={styles.mapPreviewFallback}>
-                              <Ionicons name="map-outline" size={32} color="#7a0019" />
-                              <Text style={styles.mapPreviewCoords}>
-                                {formData.destinationGeo.lat.toFixed(6)}, {formData.destinationGeo.lng.toFixed(6)}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })()}
-                  </View>
+              {/* Preferred Vehicle & Driver - Only show for institutional or rent */}
+              {(formData.vehicleMode === 'institutional' || formData.vehicleMode === 'rent') && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Preferred Vehicle & Driver</Text>
+                  <Text style={styles.helperText}>
+                    Suggest your preferred driver and vehicle (optional). The Transportation Coordinator will make the final assignment.
+                  </Text>
+                  <PreferredVehicleDriverSection
+                    preferredVehicleId={formData.preferredVehicleId}
+                    preferredDriverId={formData.preferredDriverId}
+                    onVehicleChange={(vehicleId) => handleTravelOrderChange({ preferredVehicleId: vehicleId })}
+                    onDriverChange={(driverId) => handleTravelOrderChange({ preferredDriverId: driverId })}
+                  />
                 </View>
               )}
+
 
               {/* Row 3: Departure and Return Dates */}
               <View style={styles.row}>
@@ -934,7 +1217,12 @@ export default function TravelOrderScreen() {
             {/* Contact Number Section */}
             <View style={styles.section}>
               <Text style={styles.label}>
-                Contact Number for Driver/Coordination <Text style={styles.optional}>(Optional)</Text>
+                Contact Number for Driver/Coordination 
+                {formData.vehicleMode === 'institutional' ? (
+                  <Text style={styles.required}> *</Text>
+                ) : (
+                  <Text style={styles.optional}> (Optional)</Text>
+                )}
               </Text>
               <RNTextInput
                 style={[styles.input, errors['travelOrder.requesterContactNumber'] && styles.inputError]}
@@ -986,27 +1274,18 @@ export default function TravelOrderScreen() {
 
                 <View style={styles.endorsementRow}>
                   <View style={styles.endorsementField}>
-                    <Text style={styles.endorsementLabel}>
-                      Endorsed by <Text style={styles.required}>*</Text>
-                    </Text>
-                    <RNTextInput
-                      style={[styles.endorsementInput, errors['travelOrder.endorsedByHeadName'] && styles.inputError]}
+                    <HeadSearchableSelect
                       value={isRepresentativeSubmission && requestingPersonHeadName 
                         ? requestingPersonHeadName 
                         : (formData.endorsedByHeadName || '')}
-                      onChangeText={(text) => handleTravelOrderChange({ endorsedByHeadName: text })}
-                      placeholder="Department Head Name"
-                      placeholderTextColor="#9ca3af"
-                      editable={!isRepresentativeSubmission || !requestingPersonHeadName}
+                      onChange={(headName) => handleTravelOrderChange({ endorsedByHeadName: headName })}
+                      placeholder="Search department head..."
+                      label="Endorsed by"
+                      required
+                      error={errors['travelOrder.endorsedByHeadName']}
+                      disabled={isRepresentativeSubmission && !!requestingPersonHeadName}
+                      departmentId={profile?.department_id || null}
                     />
-                    {errors['travelOrder.endorsedByHeadName'] && (
-                      <Text style={styles.errorText}>{errors['travelOrder.endorsedByHeadName']}</Text>
-                    )}
-                    {!formData.endorsedByHeadName && !requestingPersonHeadName && (
-                      <Text style={styles.warningText}>
-                        ⚠️ No department head found. Please enter the department head name manually.
-                      </Text>
-                    )}
                   </View>
 
                   <View style={styles.endorsementField}>
@@ -1014,7 +1293,7 @@ export default function TravelOrderScreen() {
                       Endorsement Date <Text style={styles.required}>*</Text>
                     </Text>
                     <DateInput
-                      value={formData.endorsedByHeadDate}
+                      value={formData.endorsedByHeadDate || ''}
                       onChange={(date) => handleTravelOrderChange({ endorsedByHeadDate: date })}
                       placeholder="Select date..."
                       error={errors['travelOrder.endorsedByHeadDate']}
@@ -1045,7 +1324,7 @@ export default function TravelOrderScreen() {
                   <SignaturePad
                     height={160}
                     value={formData.endorsedByHeadSignature || null}
-                    onSave={(dataUrl) => handleTravelOrderChange({ endorsedByHeadSignature: dataUrl })}
+                    onSave={(dataUrl) => handleTravelOrderChange({ endorsedByHeadSignature: dataUrl || '' })}
                     onClear={() => handleTravelOrderChange({ endorsedByHeadSignature: '' })}
                     hideSaveButton
                   />
@@ -1079,12 +1358,119 @@ export default function TravelOrderScreen() {
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
-                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                    <Text style={styles.submitButtonText}>Submit Request</Text>
+                    <Ionicons name="send-outline" size={20} color="#fff" />
+                    <Text style={styles.submitButtonText}>{getNextApproverText()}</Text>
                   </>
                 )}
               </TouchableOpacity>
             </View>
+            
+            {/* Smart Routing Suggestions */}
+            {(() => {
+              const suggestion = getRoutingSuggestion();
+              const hasBudget = (formData.costs?.food || 0) + 
+                               (formData.costs?.driversAllowance || 0) + 
+                               (formData.costs?.rentVehicles || 0) + 
+                               (formData.costs?.hiredDrivers || 0) + 
+                               (formData.costs?.accommodation || 0) > 0;
+              const needsVehicle = formData.vehicleMode === 'institutional' || formData.vehicleMode === 'rent';
+              const requesterIsHead = requestingPersonIsHead ?? false;
+              
+              // Show routing path preview - accurate workflow
+              const totalBudget = (formData.costs?.food || 0) + 
+                                 (formData.costs?.driversAllowance || 0) + 
+                                 (formData.costs?.rentVehicles || 0) + 
+                                 (formData.costs?.hiredDrivers || 0) + 
+                                 (formData.costs?.accommodation || 0);
+              
+              if (requesterIsHead) {
+                // Head request routing
+                const routingPath = [];
+                if (needsVehicle) {
+                  routingPath.push('Transportation Coordinator');
+                }
+                if (hasBudget) {
+                  routingPath.push('Comptroller');
+                }
+                routingPath.push('HR');
+                routingPath.push('VP');
+                routingPath.push('President'); // Heads always go to President
+                
+                return (
+                  <View style={styles.routingPathContainer}>
+                    <View style={styles.routingPathHeader}>
+                      <Ionicons name="route-outline" size={16} color="#7a0019" />
+                      <Text style={styles.routingPathTitle}>Routing Path (Head Request)</Text>
+                    </View>
+                    <View style={styles.routingPathList}>
+                      {routingPath.map((step, index) => (
+                        <View key={index} style={styles.routingPathItem}>
+                          <View style={styles.routingPathNumber}>
+                            <Text style={styles.routingPathNumberText}>{index + 1}</Text>
+                          </View>
+                          <Text style={styles.routingPathStep}>{step}</Text>
+                          {index < routingPath.length - 1 && (
+                            <Ionicons name="arrow-down" size={16} color="#9ca3af" style={styles.routingPathArrow} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                );
+              } else if (!suggestion) {
+                // Faculty request routing
+                const routingPath = [];
+                routingPath.push('Department Head');
+                // Check if has parent department (would show parent head, but we don't have that info here)
+                // Transportation Coordinator comes after head approval (if vehicle needed)
+                if (needsVehicle) {
+                  routingPath.push('Transportation Coordinator');
+                }
+                // Comptroller only if has budget
+                if (hasBudget) {
+                  routingPath.push('Comptroller');
+                }
+                routingPath.push('HR');
+                routingPath.push('VP');
+                // President if budget > 15k for faculty
+                if (totalBudget > 15000) {
+                  routingPath.push('President');
+                }
+                
+                return (
+                  <View style={styles.routingPathContainer}>
+                    <View style={styles.routingPathHeader}>
+                      <Ionicons name="route-outline" size={16} color="#7a0019" />
+                      <Text style={styles.routingPathTitle}>Routing Path</Text>
+                    </View>
+                    <View style={styles.routingPathList}>
+                      {routingPath.map((step, index) => (
+                        <View key={index} style={styles.routingPathItem}>
+                          <View style={styles.routingPathNumber}>
+                            <Text style={styles.routingPathNumberText}>{index + 1}</Text>
+                          </View>
+                          <Text style={styles.routingPathStep}>{step}</Text>
+                          {index < routingPath.length - 1 && (
+                            <Ionicons name="arrow-down" size={16} color="#9ca3af" style={styles.routingPathArrow} />
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                );
+              }
+              
+              if (suggestion) {
+                return (
+                  <View style={styles.routingSuggestion}>
+                    <Ionicons name="information-circle-outline" size={16} color="#2563eb" />
+                    <Text style={styles.routingSuggestionText}>{suggestion}</Text>
+                  </View>
+                );
+              }
+              
+              return null;
+            })()}
           </View>
 
           <View style={{ height: Platform.OS === 'ios' ? 100 : 80 }} />
@@ -1130,6 +1516,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    overflow: 'hidden',
   },
   scrollContent: {
     padding: 16,
@@ -1187,7 +1574,7 @@ const styles = StyleSheet.create({
   requiredBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#7a0019',
+    color: '#7A0010',
   },
   fillCurrentButton: {
     flexDirection: 'row',
@@ -1195,7 +1582,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#7a0019',
+    borderColor: '#7A0010',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1204,11 +1591,17 @@ const styles = StyleSheet.create({
   fillCurrentButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#7a0019',
+    color: '#7A0010',
   },
   section: {
     gap: 12,
     marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
   },
   row: {
     flexDirection: 'row',
@@ -1262,6 +1655,12 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: '#dc2626',
     backgroundColor: '#fef2f2',
+    borderWidth: 2,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 4,
   },
   errorText: {
     fontSize: 12,
@@ -1408,7 +1807,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   submitButton: {
-    backgroundColor: '#7a0019',
+    backgroundColor: '#7A0010',
   },
   submitButtonDisabled: {
     opacity: 0.6,
@@ -1457,5 +1856,125 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  vehicleModeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  vehicleModeOption: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#fff',
+    gap: 8,
+    minHeight: 100,
+  },
+  vehicleModeOptionActive: {
+    borderColor: '#7A0010',
+    backgroundColor: '#fef2f2',
+  },
+  vehicleModeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  vehicleModeTextActive: {
+    color: '#7A0010',
+  },
+  preferredSection: {
+    marginTop: 8,
+  },
+  selectContainer: {
+    marginTop: 8,
+  },
+  selectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#fff',
+    minHeight: 48,
+  },
+  selectButtonText: {
+    fontSize: 16,
+    color: '#111827',
+    flex: 1,
+  },
+  routingSuggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563eb',
+  },
+  routingSuggestionText: {
+    fontSize: 13,
+    color: '#1e40af',
+    fontWeight: '500',
+    flex: 1,
+  },
+  routingPathContainer: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  routingPathHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  routingPathTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  routingPathList: {
+    gap: 8,
+  },
+  routingPathItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  routingPathNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#7a0019',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routingPathNumberText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  routingPathStep: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  routingPathArrow: {
+    marginLeft: 'auto',
   },
 });

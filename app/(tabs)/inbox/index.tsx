@@ -10,12 +10,16 @@ import {
   Alert,
   TextInput,
   ScrollView,
+  Animated,
 } from 'react-native';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHeadInbox } from '@/hooks/useHeadInbox';
 import { useVPInbox } from '@/hooks/useVPInbox';
 import { usePresidentInbox } from '@/hooks/usePresidentInbox';
 import { useHRInbox } from '@/hooks/useHRInbox';
+import { useComptrollerInbox } from '@/hooks/useComptrollerInbox';
+import { isComptroller } from '@/lib/utils';
 import { Request } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -49,13 +53,20 @@ export default function InboxScreen() {
   const vpInbox = useVPInbox(profile?.id || '');
   const presidentInbox = usePresidentInbox(profile?.id || '');
   const hrInbox = useHRInbox(profile?.id || '');
+  const isComptrollerUser = isComptroller(profile?.email || '');
+  const comptrollerInbox = useComptrollerInbox(isComptrollerUser ? profile?.id || '' : '');
 
   let requests: Request[] = [];
   let isLoading = false;
   let error: Error | null = null;
   let refetch = () => {};
 
-  if (profile?.is_head) {
+  if (isComptrollerUser) {
+    requests = comptrollerInbox.requests || [];
+    isLoading = comptrollerInbox.isLoading;
+    error = comptrollerInbox.error as Error | null;
+    refetch = comptrollerInbox.refetch;
+  } else if (profile?.is_head) {
     requests = headInbox.requests || [];
     isLoading = headInbox.isLoading;
     error = headInbox.error as Error | null;
@@ -89,11 +100,46 @@ export default function InboxScreen() {
   };
 
   const getRoleTitle = () => {
+    if (isComptrollerUser) return 'Budget Review';
     if (profile?.is_head) return 'Head Inbox';
     if (profile?.is_vp) return 'VP Inbox';
     if (profile?.is_president) return 'President Inbox';
     if (profile?.is_hr) return 'HR Inbox';
     return 'Inbox';
+  };
+
+  // Gesture handlers for swipe navigation
+  const translateX = React.useRef(new Animated.Value(0)).current;
+
+  const onGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: translateX } }],
+    { useNativeDriver: true }
+  );
+
+  const onHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      
+      // Swipe right threshold: 50px or fast swipe
+      if (translationX > 50 || velocityX > 500) {
+        // Haptic feedback (optional - requires expo-haptics)
+        try {
+          const Haptics = require('expo-haptics');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {
+          // Haptics not available, continue without it
+        }
+        router.push('/(tabs)/dashboard');
+      }
+      
+      // Reset animation
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }).start();
+    }
   };
 
   // Filter and search requests
@@ -133,13 +179,13 @@ export default function InboxScreen() {
   if (!profile) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#7a0019" />
+        <ActivityIndicator size="large" color="#7A0010" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <NavigationHeader title={getRoleTitle()} />
       
       {/* Search and Filter Bar */}
@@ -218,10 +264,10 @@ export default function InboxScreen() {
         </View>
       ) : requests.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="mail-outline" size={64} color="#d1d5db" />
-          <Text style={styles.emptyTitle}>No Pending Requests</Text>
-          <Text style={styles.emptyText}>You're all caught up!</Text>
-          {profile?.is_head && (
+          <Ionicons name="mail-outline" size={80} color="#9ca3af" />
+          <Text style={styles.emptyTitle}>All Caught Up!</Text>
+          <Text style={styles.emptyText}>No pending requests at the moment.</Text>
+          {profile?.is_head && __DEV__ && (
             <Text style={styles.debugText}>
               Debug: Head ID: {profile.id?.substring(0, 8)}..., Dept: {profile.department_id?.substring(0, 8)}...
             </Text>
@@ -229,7 +275,7 @@ export default function InboxScreen() {
         </View>
       ) : filteredRequests.length === 0 && (searchQuery || filterStatus !== 'all') ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="search-outline" size={64} color="#d1d5db" />
+          <Ionicons name="search-outline" size={80} color="#9ca3af" />
           <Text style={styles.emptyTitle}>No Results Found</Text>
           <Text style={styles.emptyText}>
             Try adjusting your search or filter criteria
@@ -245,29 +291,54 @@ export default function InboxScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={filteredRequests}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <InboxRequestCard
-              request={item}
-              role={profile.is_head ? 'head' : profile.is_vp ? 'vp' : profile.is_president ? 'president' : 'hr'}
-            />
-          )}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7a0019" />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="mail-outline" size={64} color="#d1d5db" />
-              <Text style={styles.emptyTitle}>No Pending Requests</Text>
-              <Text style={styles.emptyText}>You're all caught up!</Text>
-            </View>
-          }
-        />
+        <PanGestureHandler
+          onGestureEvent={onGestureEvent}
+          onHandlerStateChange={onHandlerStateChange}
+          activeOffsetX={10}
+          failOffsetY={[-5, 5]}
+        >
+          <FlatList
+            data={filteredRequests}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => (
+              <Animated.View
+                style={{
+                  opacity: 1,
+                  transform: [{ translateY: 0 }],
+                }}
+              >
+                <InboxRequestCard
+                  request={item}
+                  role={
+                    isComptrollerUser ? 'comptroller' :
+                    profile.is_head ? 'head' : 
+                    profile.is_vp ? 'vp' : 
+                    profile.is_president ? 'president' : 
+                    'hr'
+                  }
+                />
+              </Animated.View>
+            )}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh} 
+                tintColor="#7A0010"
+                colors={['#7A0010']}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="mail-outline" size={80} color="#9ca3af" />
+                <Text style={styles.emptyTitle}>All Caught Up!</Text>
+                <Text style={styles.emptyText}>No pending requests at the moment.</Text>
+              </View>
+            }
+          />
+        </PanGestureHandler>
       )}
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -396,6 +467,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  filterChip: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#fff',
+    marginRight: 8,
+  },
+  filterChipText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+  },
 });
 
 function FilterChip({
@@ -433,26 +521,4 @@ function FilterChip({
   );
 }
 
-const filterChipStyles = StyleSheet.create({
-  filterChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
-    marginRight: 8,
-  },
-  filterChipText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  filterChipTextActive: {
-    color: '#fff',
-  },
-});
-
-// Merge filter chip styles into main styles
-Object.assign(styles, filterChipStyles);
 

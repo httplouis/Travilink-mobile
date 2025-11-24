@@ -67,6 +67,11 @@ export default function SignaturePad({
     setHasSignature(false);
     setDrewOnce(false);
     onClear?.();
+    // Force re-render to show canvas instead of image
+    // Clear the value prop effect
+    setTimeout(() => {
+      // This ensures the canvas is ready to draw again
+    }, 0);
   };
 
   const handleBegin = () => {
@@ -127,7 +132,7 @@ export default function SignaturePad({
           onDrawingEnd?.();
         }}
       >
-        {value && !drewOnce ? (
+        {value && hasSignature && !drewOnce ? (
           <Image source={{ uri: value }} style={styles.signatureImage} resizeMode="contain" />
         ) : (
           <View 

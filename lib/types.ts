@@ -11,8 +11,10 @@ export type RequestStatus =
   | 'pending_exec'
   | 'pending_hr_ack'
   | 'approved'
+  | 'completed'
   | 'rejected'
-  | 'cancelled';
+  | 'cancelled'
+  | 'returned';
 
 // Request Type
 export type RequestType = 'travel_order' | 'seminar';
@@ -134,6 +136,12 @@ export interface Request {
   rejected_by: string | null;
   rejection_reason: string | null;
   rejection_stage: string | null;
+  
+  // Return to Sender
+  returned_at: string | null;
+  returned_by: string | null;
+  return_reason: string | null;
+  returned_comments: string | null;
   
   // File Attachments
   attachments?: Array<{

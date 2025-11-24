@@ -9,6 +9,10 @@ export interface Driver {
   profile_picture?: string;
   status?: string;
   position_title?: string;
+  license_no?: string;
+  license_expiry?: string;
+  driver_rating?: number;
+  phone?: string;
 }
 
 export function useDrivers(filters?: { status?: string }) {
@@ -23,6 +27,7 @@ export function useDrivers(filters?: { status?: string }) {
       const wantsStatusFilter = filters?.status === 'active' || filters?.status === 'inactive';
       
       while (true) {
+        // First, fetch users with driver role
         let query = supabase
           .from('users')
           .select('id, name, email, phone_number, profile_picture, status, position_title')
@@ -43,7 +48,54 @@ export function useDrivers(filters?: { status?: string }) {
           console.log('[useDrivers] 📋 Fetching ALL drivers (no status filter)');
         }
 
-        const { data, error } = await query;
+        const { data: usersData, error: usersError } = await query;
+        
+        if (usersError) {
+          console.error('[useDrivers] ❌ Users query error:', usersError);
+          if (wantsStatusFilter && !attemptWithStatus) {
+            attemptWithStatus = true;
+            continue;
+          }
+          throw usersError;
+        }
+        
+        if (!usersData || usersData.length === 0) {
+          console.warn('[useDrivers] ⚠️ No users found with driver role');
+          return [];
+        }
+        
+        // Now fetch driver details from drivers table
+        const userIds = usersData.map(u => u.id);
+        const { data: driversData, error: driversError } = await supabase
+          .from('drivers')
+          .select('user_id, license_no, license_expiry, driver_rating, phone')
+          .in('user_id', userIds);
+        
+        if (driversError) {
+          console.warn('[useDrivers] ⚠️ Could not fetch driver details:', driversError);
+          // Continue without driver details - return users only
+        }
+        
+        // Create a map of driver details by user_id
+        const driversMap = new Map();
+        (driversData || []).forEach((d: any) => {
+          driversMap.set(d.user_id, d);
+        });
+        
+        // Combine user data with driver details
+        const { data, error } = {
+          data: usersData.map((user: any) => {
+            const driverInfo = driversMap.get(user.id);
+            return {
+              ...user,
+              license_no: driverInfo?.license_no || null,
+              license_expiry: driverInfo?.license_expiry || null,
+              driver_rating: driverInfo?.driver_rating || null,
+              phone: driverInfo?.phone || user.phone_number || null,
+            };
+          }),
+          error: null,
+        };
 
         if (error) {
           console.error('[useDrivers] ❌ Query error:', error);

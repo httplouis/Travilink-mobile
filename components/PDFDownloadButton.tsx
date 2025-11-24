@@ -12,11 +12,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Linking } from 'react-native';
+import { formatPDFFilename } from '@/lib/utils/pdf-helpers';
 
 interface PDFDownloadButtonProps {
   requestId: string;
   fileCode?: string | null;
   requestNumber?: string;
+  requesterName?: string | null;
+  requestType?: 'travel_order' | 'seminar' | string | null;
   disabled?: boolean;
 }
 
@@ -26,6 +29,8 @@ export default function PDFDownloadButton({
   requestId,
   fileCode,
   requestNumber,
+  requesterName,
+  requestType = 'travel_order',
   disabled = false,
 }: PDFDownloadButtonProps) {
   const [downloading, setDownloading] = useState(false);
@@ -48,11 +53,8 @@ export default function PDFDownloadButton({
 
       // For mobile, we'll try to download from the URL
       // If it's a Supabase function or web API, we need the full URL
-      const fileName = fileCode 
-        ? `${fileCode}.pdf` 
-        : requestNumber 
-        ? `${requestNumber}.pdf`
-        : `request-${requestId}.pdf`;
+      // Use new filename format: TO-2025-{TravelNumber}-{RequesterName}.pdf
+      const fileName = formatPDFFilename(requestNumber, requesterName, requestType);
 
       if (Platform.OS === 'web') {
         // For web, open in new tab

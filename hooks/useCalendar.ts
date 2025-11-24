@@ -15,6 +15,13 @@ export function useCalendar(userId: string, startDate: Date, endDate: Date) {
       // Fetch all approved/pending requests within date range (not just user's requests)
       // This matches web version behavior - showing all bookings on the calendar
       // Include more statuses to show all relevant requests
+      
+      // Set proper date boundaries (start of day to end of day)
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      // Query for requests where travel dates overlap with the date range
+      // A request overlaps if: travel_start_date <= endDate AND travel_end_date >= startDate
       const { data, error } = await supabase
         .from('requests')
         .select(`
@@ -40,10 +47,9 @@ export function useCalendar(userId: string, startDate: Date, endDate: Date) {
           'pending_president',
           'pending_comptroller'
         ] as RequestStatus[])
-        .gte('travel_start_date', startDate.toISOString().split('T')[0])
-        .lte('travel_end_date', endDate.toISOString().split('T')[0])
-        .order('travel_start_date', { ascending: true })
-        .limit(1000); // Increase limit to get all requests
+        .lte('travel_start_date', `${endDateStr}T23:59:59.999Z`)
+        .gte('travel_end_date', `${startDateStr}T00:00:00.000Z`)
+        .order('travel_start_date', { ascending: true });
 
       if (error) throw error;
 

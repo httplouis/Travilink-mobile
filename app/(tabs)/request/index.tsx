@@ -26,7 +26,7 @@ export default function RequestScreen() {
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push('/request/new?type=travel_order')}
+            onPress={() => router.push('/request/travel-order')}
           >
             <Ionicons name="car-outline" size={24} color="#fff" />
             <Text style={styles.actionButtonText}>Travel Order</Text>
@@ -37,7 +37,7 @@ export default function RequestScreen() {
 
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonSecondary]}
-            onPress={() => router.push('/request/new?type=seminar')}
+            onPress={() => router.push('/request/seminar')}
           >
             <Ionicons name="school-outline" size={24} color="#7a0019" />
             <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
