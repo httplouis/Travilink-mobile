@@ -178,9 +178,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#111827',
+    marginBottom: 6,
+    lineHeight: 20,
   },
   required: {
     color: '#dc2626',
@@ -188,12 +190,13 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 44,
+    minHeight: 52, // Accessibility: minimum touch target
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#e5e7eb',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   inputContainerError: {
     borderColor: '#dc2626',
@@ -226,14 +229,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef2f2',
   },
   errorText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#dc2626',
+    lineHeight: 18,
   },
   helperText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6b7280',
-    marginTop: 4,
+    marginTop: 6,
+    fontWeight: '500',
+    lineHeight: 18,
   },
   modalOverlay: {
     flex: 1,

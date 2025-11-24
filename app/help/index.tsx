@@ -17,7 +17,7 @@ export default function HelpScreen() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
 
   const handleContactSupport = () => {
-    Linking.openURL('mailto:support@mseuf.edu.ph?subject=TraviLink Mobile Support');
+    Linking.openURL('mailto:support@mseuf.edu.ph?subject=TraveLink Mobile Support');
   };
 
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);

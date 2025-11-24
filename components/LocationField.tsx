@@ -91,13 +91,15 @@ export default function LocationField({
         </Text>
       )}
       
-      {/* Map Picker Modal */}
-      <MapPicker
-        open={isMapPickerOpen}
-        onClose={() => setIsMapPickerOpen(false)}
-        onPick={handleMapPick}
-        initial={initialPlace}
-      />
+      {/* Map Picker Modal - Only render when open to prevent infinite loops */}
+      {isMapPickerOpen && (
+        <MapPicker
+          open={isMapPickerOpen}
+          onClose={() => setIsMapPickerOpen(false)}
+          onPick={handleMapPick}
+          initial={initialPlace}
+        />
+      )}
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>

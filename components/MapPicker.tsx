@@ -87,7 +87,7 @@ async function nominatimSearch(query: string): Promise<NominatimHit[]> {
       `https://nominatim.openstreetmap.org/search?${params.toString()}`,
       {
         headers: {
-          'User-Agent': 'TraviLink-Mobile/1.0', // Required by Nominatim
+          'User-Agent': 'TraveLink-Mobile/1.0', // Required by Nominatim
         },
       }
     );
@@ -114,7 +114,7 @@ async function nominatimReverse(lat: number, lng: number): Promise<string | null
       `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
       {
         headers: {
-          'User-Agent': 'TraviLink-Mobile/1.0',
+          'User-Agent': 'TraveLink-Mobile/1.0',
         },
       }
     );
@@ -143,8 +143,8 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
   });
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
 
-  // Debounced search
-  const debouncedSearch = useDebounce(async (query: string) => {
+  // Debounced search - use useCallback to prevent recreation
+  const performSearch = useCallback(async (query: string) => {
     const trimmed = query.trim();
     if (!trimmed) {
       setSearchResults([]);
@@ -161,7 +161,9 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
     } finally {
       setIsSearching(false);
     }
-  }, 450);
+  }, []);
+
+  const debouncedSearch = useDebounce(performSearch, 450);
 
   useEffect(() => {
     if (searchQuery) {
@@ -169,11 +171,16 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
     } else {
       setSearchResults([]);
     }
-  }, [searchQuery, debouncedSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]); // Only depend on searchQuery, not debouncedSearch
+
+  // Track if location was already fetched to prevent infinite loops
+  const locationFetchedRef = React.useRef(false);
 
   // Initialize with current location if no initial place (native only)
   useEffect(() => {
-    if (open && !initial && Location && Platform.OS !== 'web') {
+    if (open && !initial && !locationFetchedRef.current && Location && Platform.OS !== 'web') {
+      locationFetchedRef.current = true;
       Location.getCurrentPositionAsync({})
         .then((location: any) => {
           setMapRegion({
@@ -186,6 +193,10 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
         .catch(() => {
           // Use default Manila location
         });
+    }
+    // Reset when modal closes
+    if (!open) {
+      locationFetchedRef.current = false;
     }
   }, [open, initial]);
 
@@ -239,6 +250,7 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
     }
   };
 
+  // Don't render anything when closed to prevent unnecessary re-renders
   if (!open) return null;
 
   return (
@@ -306,7 +318,14 @@ export default function MapPicker({ open, onClose, onPick, initial }: MapPickerP
               provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
               style={styles.map}
               region={mapRegion}
-              onRegionChangeComplete={setMapRegion}
+              onRegionChangeComplete={(region) => {
+                // Only update if region actually changed significantly to prevent infinite loops
+                const latDiff = Math.abs(region.latitude - mapRegion.latitude);
+                const lngDiff = Math.abs(region.longitude - mapRegion.longitude);
+                if (latDiff > 0.001 || lngDiff > 0.001) {
+                  setMapRegion(region);
+                }
+              }}
               onPress={handleMapPress}
               showsUserLocation={true}
               showsMyLocationButton={true}

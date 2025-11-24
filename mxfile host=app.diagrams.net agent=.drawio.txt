@@ -1,0 +1,126 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36" version="29.1.1">
+  <diagram name="TraviLink System Features" id="travilink-features">
+    <mxGraphModel dx="1097" dy="604" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="center" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="TraviLink: Web and Mobile Application&lt;br&gt;for Scheduling and Tracking Campus Transport Services" vertex="1">
+          <mxGeometry height="70" width="500" x="1150" y="765" as="geometry" />
+        </mxCell>
+        <mxCell id="basic" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" value="Basic Features" vertex="1">
+          <mxGeometry height="70" width="300" x="1250" y="565" as="geometry" />
+        </mxCell>
+        <mxCell id="core" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" value="Core Features" vertex="1">
+          <mxGeometry height="70" width="300" x="1250" y="965" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1000" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Login" vertex="1">
+          <mxGeometry height="50" width="200" x="1190" y="405" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1001" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Document Uploads&lt;br&gt;(signed pages)" vertex="1">
+          <mxGeometry height="50" width="200" x="1430" y="405" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1002" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="User Registration" vertex="1">
+          <mxGeometry height="50" width="200" x="910" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1003" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Profile Management" vertex="1">
+          <mxGeometry height="50" width="200" x="910" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1004" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Trip Request Form" vertex="1">
+          <mxGeometry height="50" width="200" x="910" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1005" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Notifications&lt;br&gt;(email/in-app)" vertex="1">
+          <mxGeometry height="50" width="200" x="1670" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1006" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Usage History&lt;br&gt;(requests)" vertex="1">
+          <mxGeometry height="50" width="200" x="1670" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="basic-feat-1007" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Status Viewing&lt;br&gt;(per request)" vertex="1">
+          <mxGeometry height="50" width="200" x="1670" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="core-feat-1008" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Calendar with Preventive Day Limit&lt;br&gt;(pencil-booked = full)" vertex="1">
+          <mxGeometry height="50" width="200" x="920" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="core-feat-1009" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Vehicle Availability View" vertex="1">
+          <mxGeometry height="50" width="200" x="920" y="1050" as="geometry" />
+        </mxCell>
+        <mxCell id="core-feat-1010" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Final Received Marking&lt;br&gt;(after fully signed)" vertex="1">
+          <mxGeometry height="50" width="200" x="1630" y="1050" as="geometry" />
+        </mxCell>
+        <mxCell id="core-feat-1011" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="PDF Generation&lt;br&gt;(needed signatory pages)" vertex="1">
+          <mxGeometry height="50" width="200" x="1300" y="1120" as="geometry" />
+        </mxCell>
+        <mxCell id="core-feat-1012" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Email Handoff&lt;br&gt;(sent by transport office)" vertex="1">
+          <mxGeometry height="50" width="200" x="920" y="975" as="geometry" />
+        </mxCell>
+        <mxCell id="core-feat-1013" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Cost Sheets &amp; Simple Expense Fields" vertex="1">
+          <mxGeometry height="50" width="200" x="1630" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="core-feat-1014" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=10;" value="Maintenance Records&lt;br&gt;(LTO, PMS, repairs, insurance)&lt;br&gt;+ Reminders" vertex="1">
+          <mxGeometry height="50" width="200" x="1630" y="975" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-center-basic" edge="1" parent="1" source="center" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#000000;endArrow=block;endFill=1;startArrow=block;startFill=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="basic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-center-core" edge="1" parent="1" source="center" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#000000;endArrow=block;endFill=1;startArrow=block;startFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-basic-1000" edge="1" parent="1" source="basic-feat-1000" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0.5;exitY=1.0;entryX=0.5;entryY=0.0;" target="basic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-basic-1001" edge="1" parent="1" source="basic-feat-1001" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0.5;exitY=1.0;entryX=0.5;entryY=0.0;" target="basic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-basic-1002" edge="1" parent="1" source="basic-feat-1002" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.5;" target="basic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-basic-1003" edge="1" parent="1" source="basic-feat-1003" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.5;" target="basic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-basic-1004" edge="1" parent="1" source="basic-feat-1004" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.5;" target="basic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-basic-1005" edge="1" parent="1" source="basic-feat-1005" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="675" />
+              <mxPoint x="1620" y="600" />
+            </Array>
+            <mxPoint x="1550" y="600" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-basic-1006" edge="1" parent="1" source="basic-feat-1006" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitDx=0;exitDy=0;" target="basic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-basic-1007" edge="1" parent="1" source="basic-feat-1007" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitDx=0;exitDy=0;" target="basic">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="525" />
+              <mxPoint x="1620" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-core-1008" edge="1" parent="1" source="core-feat-1008" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.5;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-core-1009" edge="1" parent="1" source="core-feat-1009" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.5;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-core-1010" edge="1" parent="1" source="core-feat-1010" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitDx=0;exitDy=0;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-core-1011" edge="1" parent="1" source="core-feat-1011" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitDx=0;exitDy=0;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-core-1012" edge="1" parent="1" source="core-feat-1012" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;entryX=0.0;entryY=0.5;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-core-1013" edge="1" parent="1" source="core-feat-1013" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitDx=0;exitDy=0;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-core-1014" edge="1" parent="1" source="core-feat-1014" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2.5;strokeColor=#000000;endArrow=block;endFill=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitDx=0;exitDy=0;" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

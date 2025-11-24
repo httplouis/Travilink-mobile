@@ -1,0 +1,92 @@
+# Figure 8 Description - Relational Diagram
+
+
+
+Figure 8 shows the relational diagram of the TraviLink system, which illustrates how the database tables are structured and connected to handle trip planning, vehicle scheduling, maintenance tracking, and user communication. The diagram consists of condensed twelve tables that work together to manage the complete transportation request workflow.
+
+
+
+TraveLink begins with the departments table, which stores department information such as unique department codes and names. The users table contains user accounts that include email addresses, names, and their assigned department. Users can also be linked to their respective departments through the department_id foreign key, and the department_heads table creates a many-to-many relationship between users and departments, which allows a user to serve as the head of multiple departments when needed.
+
+
+
+Users can create trip requests through the **requests** table, which stores request details including unique request numbers, the requester information, department association, assigned vehicle and driver, and current status. The requests table is the central hub that connects users, departments, vehicles, and drivers. Whenever a request is processed, the **request_history** table records all actions and status changes, tracking which user performed each action and when it occurred.
+
+
+
+After trips are completed, users can submit feedback and that'll store into the **feedback** table, which allows them to rate and comment on their travel experience. The feedback table connects to the users, trips, vehicles, and drivers, providing comprehensive feedback data that can be used to improve service quality.
+
+
+
+Vehicle information is recorded in the vehicles table, which keeps details such as plate numbers, vehicle classifications, passenger capacity, and current status. After a vehicle is registered, it is connected to the maintenance_records table so the system can log service actions, maintenance types, descriptions, and costs. This relationship keeps the maintenance history organized and can be used to plan preventive maintenance effectively.
+
+
+
+Drivers are represented through the **drivers** table, which links to the users table since drivers are users with additional information such as license numbers. The drivers table connects to requests and trips, showing which drivers are assigned to specific transportation services.
+
+
+
+The system includes a **notifications** table that alerts users about relevant events or updates, such as request approvals, status changes, or trip assignments. Notifications are linked to specific users and track whether they have been read.
+
+
+
+Role management is handled through the **role_grants** table, which records when specific roles are assigned to users and tracks the timestamp of each grant. This table maintains a history of role assignments and supports the role-based access control system.
+
+
+
+The schema shows how the system manages trip coordination, vehicle and driver assignments, user interactions, maintenance tracking, and notifications in one centralized structure. Once the tables connect, the relationships ensure consistent data and allow the system to follow the entire lifecycle of each transportation request, from the initial submission to approval and trip execution, and eventually to completion and feedback. After everything is linked, the system can also present a clearer operational picture, which improves efficiency and strengthens service quality by showing all transportation activities in an organized and unified way.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

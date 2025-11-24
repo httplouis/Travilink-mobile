@@ -1,21 +1,20 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { getTabsForRole } from '@/lib/utils/navigation';
 
-// New hierarchy: Home, Calendar, Request, "My Requests", More
-const tabs = [
-  { name: 'dashboard', label: 'Home', icon: 'home-outline', iconFocused: 'home', route: '/(tabs)/dashboard' },
-  { name: 'calendar', label: 'Calendar', icon: 'calendar-outline', iconFocused: 'calendar', route: '/(tabs)/calendar' },
-  { name: 'request', label: 'Request', icon: 'add-circle-outline', iconFocused: 'add-circle', route: '/(tabs)/request' },
-  { name: 'submissions', label: 'Requests', icon: 'list-outline', iconFocused: 'list', route: '/(tabs)/submissions' },
-  { name: 'more', label: 'More', icon: 'ellipsis-horizontal-outline', iconFocused: 'ellipsis-horizontal', route: '/(tabs)/more' },
-];
+const windowWidth = Dimensions.get('window').width;
 
 export default function CustomTabBar() {
   const router = useRouter();
   const segments = useSegments();
+  const { profile } = useAuth();
   const indicatorAnim = useRef(new Animated.Value(0)).current;
+
+  // Get role-based tabs (Request always in position 3 - middle)
+  const tabs = useMemo(() => getTabsForRole(profile), [profile]);
 
   const isActive = (route: string) => {
     const routePath = route.replace(/[()]/g, '').replace(/^\/tabs\//, '');
@@ -37,9 +36,11 @@ export default function CustomTabBar() {
     }
   }, [segments, indicatorAnim]);
 
+  const tabWidth = windowWidth / tabs.length;
+  
   const translateX = indicatorAnim.interpolate({
     inputRange: tabs.map((_, i) => i),
-    outputRange: tabs.map((_, i) => i * (windowWidth / tabs.length)),
+    outputRange: tabs.map((_, i) => i * tabWidth),
   });
 
   return (
@@ -49,6 +50,7 @@ export default function CustomTabBar() {
         style={[
           styles.indicator,
           {
+            width: tabWidth,
             transform: [{ translateX }],
           },
         ]}
@@ -77,9 +79,6 @@ export default function CustomTabBar() {
     </View>
   );
 }
-
-const windowWidth = Dimensions.get('window').width;
-const tabWidth = windowWidth / tabs.length;
 
 const styles = StyleSheet.create({
   tabBar: {
@@ -120,7 +119,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: tabWidth,
     height: 3,
     backgroundColor: '#7a0019',
     borderRadius: 1.5,

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RequestStatus } from '@/lib/types';
+import { formatDateTime } from '@/lib/utils';
 
 interface ApprovalStage {
   key: string;
@@ -267,7 +268,7 @@ export default function RequestStatusTracker({
 
               <View style={styles.timelineContent}>
                 <View style={styles.timelineHeader}>
-                  <View>
+                  <View style={styles.timelineHeaderLeft}>
                     <Text
                       style={[
                         styles.timelineLabel,
@@ -278,11 +279,21 @@ export default function RequestStatusTracker({
                       {stage.label}
                     </Text>
                     <Text style={styles.timelineRole}>{stage.role}</Text>
+                    {stageStatus === 'completed' && approverName && (
+                      <Text style={styles.timelineApproverName}>
+                        Approved by {approverName}
+                      </Text>
+                    )}
+                    {stageStatus === 'completed' && getApprovalTimestamp(stage.key) && (
+                      <Text style={styles.timelineApprovalTime}>
+                        {formatDateTime(getApprovalTimestamp(stage.key)!)}
+                      </Text>
+                    )}
                   </View>
                   
-                  {stageStatus === 'completed' && approverName && (
+                  {stageStatus === 'completed' && (
                     <View style={styles.timelineApprover}>
-                      <Text style={styles.timelineApproverName}>{approverName}</Text>
+                      <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
                     </View>
                   )}
                   

@@ -22,11 +22,14 @@ import SidebarMenu from '@/components/SidebarMenu';
 export default function VehiclesScreen() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>('available');
   const [typeFilter, setTypeFilter] = useState<string | undefined>();
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // All hooks must be called before any early returns
   const { data: vehicles = [], isLoading, error, refetch } = useVehicles({
     status: statusFilter,
     type: typeFilter,
   });
-  const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -81,8 +84,6 @@ export default function VehiclesScreen() {
       </View>
     );
   }
-
-  const [searchQuery, setSearchQuery] = useState('');
 
   const filteredVehicles = vehicles.filter((vehicle) => {
     if (!searchQuery.trim()) return true;

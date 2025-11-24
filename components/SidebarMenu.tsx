@@ -206,6 +206,17 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
 
           {/* Menu Items */}
           <View style={styles.menu}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleNavigate('/(tabs)/calendar')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="calendar-outline" size={24} color="#6b7280" />
+                <Text style={styles.menuItemLabel}>Calendar</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
+            </TouchableOpacity>
             {filteredMenuItems.map((item) => (
               <TouchableOpacity
                 key={item.path}

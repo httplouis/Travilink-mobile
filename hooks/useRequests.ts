@@ -14,42 +14,69 @@ export function useRequests(userId: string) {
         return [];
       }
 
-      const { data, error } = await supabase
-        .from('requests')
-        .select('*')
-        .eq('requester_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      // Create AbortController for request cancellation
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 15000); // 15 second timeout
 
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase
+          .from('requests')
+          .select('*')
+          .eq('requester_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(100)
+          .abortSignal(abortController.signal);
 
-      // Fetch departments separately for each request to avoid FK join issues
-      const requestsWithDepartments = await Promise.all(
-        (data || []).map(async (req) => {
-          if (req.department_id) {
-            try {
-              const { data: deptData } = await supabase
-                .from('departments')
-                .select('id, code, name')
-                .eq('id', req.department_id)
-                .single();
-              
-              return {
-                ...req,
-                department: deptData || null,
-              };
-            } catch {
-              return { ...req, department: null };
-            }
+        if (error) {
+          // Don't throw on abort errors - just return empty array
+          if (error.message?.includes('Aborted') || error.message?.includes('abort')) {
+            console.log('[useRequests] Request aborted (likely component unmounted)');
+            clearTimeout(timeoutId);
+            return [];
           }
-          return { ...req, department: null };
-        })
-      );
+          clearTimeout(timeoutId);
+          throw error;
+        }
 
-      return requestsWithDepartments as Request[];
+        // Fetch departments separately for each request to avoid FK join issues
+        const requestsWithDepartments = await Promise.all(
+          (data || []).map(async (req) => {
+            if (req.department_id) {
+              try {
+                const { data: deptData } = await supabase
+                  .from('departments')
+                  .select('id, code, name')
+                  .eq('id', req.department_id)
+                  .single();
+                
+                return {
+                  ...req,
+                  department: deptData || null,
+                };
+              } catch {
+                return { ...req, department: null };
+              }
+            }
+            return { ...req, department: null };
+          })
+        );
+
+        clearTimeout(timeoutId);
+        return requestsWithDepartments as Request[];
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        // Handle abort errors gracefully
+        if (err?.message?.includes('Aborted') || err?.message?.includes('abort') || err?.name === 'AbortError') {
+          console.log('[useRequests] Request was aborted');
+          return [];
+        }
+        throw err;
+      }
     },
     enabled: !!userId && userId.trim() !== '', // Only run query if userId is valid
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 10000, // Auto-refresh every 10 seconds (less aggressive)
+    retry: 2, // Retry failed requests up to 2 times
+    retryDelay: 1000, // Wait 1 second between retries
   });
 
   // Set up real-time subscription

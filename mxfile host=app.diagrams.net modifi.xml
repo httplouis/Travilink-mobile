@@ -1,0 +1,106 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36" version="29.1.1">
+  <diagram name="TraviLink Relational Diagram" id="relational-diagram">
+    <mxGraphModel dx="1097" dy="1604" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="dept" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="departments&#xa;─────────────&#xa;id (PK)&#xa;code&#xa;name" vertex="1">
+          <mxGeometry height="100" width="140" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="users" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="users&#xa;─────────────&#xa;id (PK)&#xa;email&#xa;name&#xa;department_id (FK)" vertex="1">
+          <mxGeometry height="120" width="140" x="530" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="vehicles" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="vehicles&#xa;─────────────&#xa;id (PK)&#xa;plate_number&#xa;type&#xa;capacity&#xa;status" vertex="1">
+          <mxGeometry height="130" width="140" x="40" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="drivers" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="drivers&#xa;─────────────&#xa;id (PK)&#xa;user_id (FK)" vertex="1">
+          <mxGeometry height="80" width="140" x="240" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="requests" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="requests&#xa;─────────────&#xa;id (PK)&#xa;request_number&#xa;requester_id (FK)&#xa;department_id (FK)&#xa;assigned_vehicle_id (FK)&#xa;assigned_driver_id (FK)&#xa;status" vertex="1">
+          <mxGeometry height="180" width="180" x="360" as="geometry" />
+        </mxCell>
+        <mxCell id="req_history" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="request_history&#xa;─────────────&#xa;id (PK)&#xa;request_id (FK)&#xa;actor_id (FK)&#xa;action" vertex="1">
+          <mxGeometry height="110" width="140" x="680" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="trips" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="trips&#xa;─────────────&#xa;id (PK)&#xa;request_id (FK)&#xa;vehicle_id (FK)&#xa;driver_id (FK)&#xa;status" vertex="1">
+          <mxGeometry height="130" width="140" x="680" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="feedback" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="feedback&#xa;─────────────&#xa;id (PK)&#xa;user_id (FK)&#xa;trip_id (FK)&#xa;vehicle_id (FK)&#xa;driver_id (FK)&#xa;rating" vertex="1">
+          <mxGeometry height="150" width="140" x="880" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="notifications" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="notifications&#xa;─────────────&#xa;id (PK)&#xa;user_id (FK)&#xa;type&#xa;read" vertex="1">
+          <mxGeometry height="110" width="140" x="880" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="maintenance" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="maintenance_records&#xa;─────────────&#xa;id (PK)&#xa;vehicle_id (FK)&#xa;maintenance_type&#xa;cost" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="dept_heads" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="department_heads&#xa;─────────────&#xa;department_id (FK)&#xa;user_id (FK)&#xa;PRIMARY KEY" vertex="1">
+          <mxGeometry height="110" width="140" x="240" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="role_grants" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="role_grants&#xa;─────────────&#xa;id (PK)&#xa;user_id (FK)&#xa;role" vertex="1">
+          <mxGeometry height="100" width="140" x="440" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" edge="1" parent="1" source="dept" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="users" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" edge="1" parent="1" source="users" style="endArrow=ERone;startArrow=ERone;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="drivers" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" edge="1" parent="1" source="dept" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="requests" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge4" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="requests" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge5" edge="1" parent="1" source="vehicles" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="requests" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge6" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.9;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="requests" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge7" edge="1" parent="1" source="requests" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="req_history" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge8" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="req_history" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge9" edge="1" parent="1" source="requests" style="endArrow=ERone;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="trips" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge10" edge="1" parent="1" source="vehicles" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="trips" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge11" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="trips" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge12" edge="1" parent="1" source="requests" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="feedback" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge13" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="feedback" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge14" edge="1" parent="1" source="vehicles" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="feedback" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge15" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="feedback" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge16" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="notifications" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge17" edge="1" parent="1" source="vehicles" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="maintenance" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge18" edge="1" parent="1" source="dept" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="dept_heads" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge19" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="dept_heads" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge20" edge="1" parent="1" source="users" style="endArrow=ERmany;startArrow=ERone;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" target="role_grants" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

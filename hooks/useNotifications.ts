@@ -25,6 +25,7 @@ export function useNotifications(userId: string) {
       return data as Notification[];
     },
     enabled: !!userId && userId.trim() !== '', // Only run query if userId is valid
+    refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 
   // Set up real-time subscription

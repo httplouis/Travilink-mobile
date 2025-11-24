@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  PanResponder,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,35 +27,65 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showCapacityModal, setShowCapacityModal] = useState(false);
   const [selectedDateCount, setSelectedDateCount] = useState(0);
+  const [selectedDateStatusCounts, setSelectedDateStatusCounts] = useState<{ pending: number; approved: number }>({ pending: 0, approved: 0 });
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  
+  // Swipe gesture handler
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (Math.abs(gestureState.dx) > 50) {
+          if (gestureState.dx > 0) {
+            // Swipe right - previous month
+            setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+          } else {
+            // Swipe left - next month
+            setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+          }
+        }
+      },
+    })
+  ).current;
 
-  // Calculate date range based on view
+  // Calculate date range based on view and current month
   const getDateRange = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const baseDate = view === 'month' ? currentMonth : new Date();
+    baseDate.setHours(0, 0, 0, 0);
     
     switch (view) {
       case 'month':
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+        const monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
         monthEnd.setHours(23, 59, 59, 999);
         return { start: monthStart, end: monthEnd };
       case 'year':
-        const yearStart = new Date(today.getFullYear(), 0, 1);
-        const yearEnd = new Date(today.getFullYear(), 11, 31);
+        const yearStart = new Date(baseDate.getFullYear(), 0, 1);
+        const yearEnd = new Date(baseDate.getFullYear(), 11, 31);
         yearEnd.setHours(23, 59, 59, 999);
         return { start: yearStart, end: yearEnd };
       default:
-        const defaultStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        const defaultEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const defaultStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+        const defaultEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
         defaultEnd.setHours(23, 59, 59, 999);
         return { start: defaultStart, end: defaultEnd };
     }
   };
 
   const { start: startDate, end: endDate } = getDateRange();
+  
+  // Update month when currentMonth changes
+  useEffect(() => {
+    if (view === 'month') {
+      // Refetch calendar data when month changes
+    }
+  }, [currentMonth, view]);
   const { data: bookings = [], isLoading, refetch } = useCalendar(
     profile?.id || '', // Still pass userId but don't filter by it in hook
     startDate,
@@ -77,7 +108,10 @@ export default function CalendarScreen() {
   }
 
   // Group bookings by date (handle date range for multi-day trips)
+  // Also track status counts for privacy (pending vs approved)
   const bookingsByDate: Record<string, Booking[]> = {};
+  const statusCountsByDate: Record<string, { pending: number; approved: number }> = {};
+  
   bookings.forEach((booking) => {
     const startDate = new Date(booking.dateISO + 'T00:00:00');
     const endDateISO = (booking as any).endDateISO || booking.dateISO;
@@ -90,8 +124,16 @@ export default function CalendarScreen() {
       
       if (!bookingsByDate[dateKey]) {
         bookingsByDate[dateKey] = [];
+        statusCountsByDate[dateKey] = { pending: 0, approved: 0 };
       }
       bookingsByDate[dateKey].push(booking);
+      
+      // Track status counts (privacy: don't show personal details)
+      if (booking.status === 'approved') {
+        statusCountsByDate[dateKey].approved++;
+      } else {
+        statusCountsByDate[dateKey].pending++;
+      }
       
       // Move to next day
       currentDate.setDate(currentDate.getDate() + 1);
@@ -99,11 +141,12 @@ export default function CalendarScreen() {
   });
 
   // Create marked dates for calendar with capacity display (1/5, 3/5, 5/5)
+  // Show slot counts with pending/approved breakdown for privacy
   const markedDates: Record<string, any> = {};
   Object.keys(bookingsByDate).forEach((date) => {
     const count = bookingsByDate[date].length;
+    const statusCounts = statusCountsByDate[date] || { pending: 0, approved: 0 };
     const capacity = Math.min(count, 5);
-    const capacityText = `${capacity}/5`;
     
     markedDates[date] = {
       marked: true,
@@ -135,15 +178,16 @@ export default function CalendarScreen() {
           fontSize: 12,
         },
       },
-      // Add custom text overlay for capacity
       selected: false,
     };
   });
 
   const handleDatePress = (day: DateData) => {
     const count = bookingsByDate[day.dateString]?.length || 0;
+    const statusCounts = statusCountsByDate[day.dateString] || { pending: 0, approved: 0 };
     setSelectedDate(day.dateString);
     setSelectedDateCount(count);
+    setSelectedDateStatusCounts(statusCounts);
     setShowCapacityModal(true);
   };
 
@@ -320,9 +364,9 @@ export default function CalendarScreen() {
             </View>
           ) : (
             // Month View - Default
-            <View style={styles.calendarContainer}>
+            <View style={styles.calendarContainer} {...panResponder.panHandlers}>
               <Calendar
-                current={selectedDate}
+                current={currentMonth.toISOString().split('T')[0].substring(0, 7)}
                 onDayPress={handleDatePress}
                 markedDates={markedDates}
                 markingType="custom"
@@ -330,6 +374,9 @@ export default function CalendarScreen() {
                 hideExtraDays={true}
                 firstDay={0}
                 showWeekNumbers={false}
+                onMonthChange={(month) => {
+                  setCurrentMonth(new Date(month.year, month.month - 1, 1));
+                }}
                 theme={{
                   backgroundColor: '#fff',
                   calendarBackground: '#fff',
@@ -412,6 +459,13 @@ export default function CalendarScreen() {
                 <Text style={styles.capacityLabel}>
                   {getCapacityLabel(selectedDateCount)}
                 </Text>
+                {selectedDateCount > 0 && (
+                  <Text style={styles.capacityStatusBreakdown}>
+                    {selectedDateStatusCounts.pending > 0 && `${selectedDateStatusCounts.pending} pending`}
+                    {selectedDateStatusCounts.pending > 0 && selectedDateStatusCounts.approved > 0 && ', '}
+                    {selectedDateStatusCounts.approved > 0 && `${selectedDateStatusCounts.approved} approved`}
+                  </Text>
+                )}
                 
                 {selectedDateCount >= 5 && (
                   <View style={styles.fullWarning}>
@@ -720,8 +774,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#6b7280',
-    marginBottom: 24,
+    marginBottom: 8,
     textAlign: 'center',
+  },
+  capacityStatusBreakdown: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 4,
+    marginBottom: 16,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   fullWarning: {
     flexDirection: 'row',

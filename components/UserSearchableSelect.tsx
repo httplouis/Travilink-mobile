@@ -204,9 +204,11 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#111827',
+    marginBottom: 6,
+    lineHeight: 20,
   },
   required: {
     color: '#dc2626',
@@ -214,12 +216,13 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 44,
+    minHeight: 52, // Accessibility: minimum touch target
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#e5e7eb',
     backgroundColor: '#fff',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   searchIcon: {
     marginRight: 8,
@@ -232,12 +235,20 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   clearButton: {
-    padding: 4,
+    padding: 8,
     marginLeft: 4,
+    minWidth: 44, // Accessibility: minimum touch target
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdownButton: {
-    padding: 4,
+    padding: 8,
     marginLeft: 4,
+    minWidth: 44, // Accessibility: minimum touch target
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdown: {
     position: 'absolute',
@@ -322,22 +333,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   optionEmail: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6b7280',
+    fontWeight: '500',
   },
   errorContainer: {
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: '#fecaca',
     backgroundColor: '#fef2f2',
   },
   errorText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#dc2626',
+    lineHeight: 18,
   },
 });
 

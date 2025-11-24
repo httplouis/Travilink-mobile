@@ -13,20 +13,45 @@ import {
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequests } from '@/hooks/useRequests';
+import { usePendingEvaluations } from '@/hooks/usePendingEvaluations';
 import RequestCard from '@/components/RequestCard';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Request, RequestStatus } from '@/lib/types';
 import NavigationHeader from '@/components/NavigationHeader';
 import SidebarMenu from '@/components/SidebarMenu';
+import { useEffect } from 'react';
+import { Alert } from 'react-native';
 
 export default function SubmissionsScreen() {
   const { profile, loading: authLoading } = useAuth();
   const { requests, isLoading, error, refetch } = useRequests(profile?.id || '');
+  const { pendingTrips, count: pendingCount } = usePendingEvaluations(profile?.id || '');
   const [refreshing, setRefreshing] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all' | 'needs_feedback'>('all');
+  const [hasShownPendingAlert, setHasShownPendingAlert] = useState(false);
+
+  // Show alert for pending evaluations (once per session)
+  useEffect(() => {
+    if (pendingCount > 0 && !hasShownPendingAlert && !authLoading && profile) {
+      setHasShownPendingAlert(true);
+      Alert.alert(
+        'Pending Trip Evaluations',
+        `You have ${pendingCount} completed trip${pendingCount !== 1 ? 's' : ''} that need feedback. Please provide your evaluation.`,
+        [
+          {
+            text: 'View Trips',
+            onPress: () => {
+              router.push('/trips');
+            },
+          },
+          { text: 'Later', style: 'cancel' },
+        ]
+      );
+    }
+  }, [pendingCount, hasShownPendingAlert, authLoading, profile]);
 
   // Don't render if still loading auth or no profile
   if (authLoading || !profile) {
@@ -61,7 +86,11 @@ export default function SubmissionsScreen() {
     let filtered = requests;
 
     // Apply status filter
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'needs_feedback') {
+      // Filter for requests that need feedback (completed trips without feedback)
+      const pendingTripIds = new Set(pendingTrips.map(t => t.id));
+      filtered = filtered.filter((req) => pendingTripIds.has(req.id));
+    } else if (statusFilter !== 'all') {
       filtered = filtered.filter((req) => req.status === statusFilter);
     }
 
@@ -78,10 +107,11 @@ export default function SubmissionsScreen() {
     }
 
     return filtered;
-  }, [requests, statusFilter, searchQuery]);
+  }, [requests, statusFilter, searchQuery, pendingTrips]);
 
-  const statusOptions: (RequestStatus | 'all')[] = [
+  const statusOptions: (RequestStatus | 'all' | 'needs_feedback')[] = [
     'all',
+    'needs_feedback',
     'pending_head',
     'pending_parent_head',
     'pending_admin',
@@ -93,6 +123,10 @@ export default function SubmissionsScreen() {
     'approved',
     'rejected',
   ];
+
+  // Check if request needs feedback
+  const pendingTripIds = new Set(pendingTrips.map(t => t.id));
+  const needsFeedback = (requestId: string) => pendingTripIds.has(requestId);
 
   if (isLoading && requests.length === 0) {
     return (
@@ -146,9 +180,19 @@ export default function SubmissionsScreen() {
         showMenu={true}
       />
       <View style={styles.subHeader}>
-        <Text style={styles.subHeaderText}>
-          {filteredRequests.length} of {requests.length} request{requests.length !== 1 ? 's' : ''}
-        </Text>
+        <View>
+          <Text style={styles.subHeaderText}>
+            {filteredRequests.length} of {requests.length} request{requests.length !== 1 ? 's' : ''}
+          </Text>
+          {pendingCount > 0 && (
+            <View style={styles.pendingEvaluationBadge}>
+              <Ionicons name="alert-circle" size={14} color="#f59e0b" />
+              <Text style={styles.pendingEvaluationText}>
+                {pendingCount} trip{pendingCount !== 1 ? 's' : ''} need feedback
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -188,7 +232,7 @@ export default function SubmissionsScreen() {
                   statusFilter === status && styles.filterChipTextActive,
                 ]}
               >
-                {status === 'all' ? 'All' : status.replace('pending_', '').replace('_', ' ')}
+                {status === 'all' ? 'All' : status === 'needs_feedback' ? 'Needs Feedback' : status.replace('pending_', '').replace('_', ' ')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -205,6 +249,7 @@ export default function SubmissionsScreen() {
             onPress={() => handleRequestPress(item)}
             onViewDetails={() => handleViewDetails(item)}
             onViewTracking={() => handleViewTracking(item)}
+            needsFeedback={needsFeedback(item.id)}
           />
         )}
           contentContainerStyle={[styles.listContent, { paddingBottom: Platform.OS === 'ios' ? 100 : 80 }]}

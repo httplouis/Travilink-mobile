@@ -50,9 +50,11 @@ export default function SignaturePad({
   }, [value]);
 
   const handleOK = (signature: string) => {
-    setHasSignature(true);
-    setDrewOnce(true);
-    onSave?.(signature);
+    if (signature && signature.length > 0) {
+      setHasSignature(true);
+      setDrewOnce(true);
+      onSave?.(signature);
+    }
   };
 
   const handleClear = () => {
@@ -63,17 +65,19 @@ export default function SignaturePad({
   };
 
   const handleBegin = () => {
-    if (!drewOnce) {
-      setDrewOnce(true);
-      onDraw?.();
-    }
+    setDrewOnce(true);
+    onDraw?.();
   };
 
   const handleEnd = () => {
-    // Auto-save on end
-    if (drewOnce) {
-      signatureRef.current?.readSignature();
-    }
+    // Don't auto-read signature on end - this causes re-renders and resets canvas
+    // Only read signature when explicitly requested (manual save button or onOK callback)
+    // This allows user to continue drawing multiple strokes without interruption
+  };
+  
+  const handleEmpty = () => {
+    // Called when signature is cleared or empty
+    setHasSignature(false);
   };
 
   const style = `
@@ -101,6 +105,7 @@ export default function SignaturePad({
             onOK={handleOK}
             onBegin={handleBegin}
             onEnd={handleEnd}
+            onEmpty={handleEmpty}
             descriptionText="Sign here"
             clearText="Clear"
             confirmText="Save"
@@ -115,6 +120,14 @@ export default function SignaturePad({
             autoClear={false}
             dataURL={value || undefined}
             rotated={false}
+            onClear={handleClear}
+            shouldCancelWhenOutside={false}
+            onGetData={(data) => {
+              // Additional callback to ensure signature is captured
+              if (data && data.length > 0) {
+                setHasSignature(true);
+              }
+            }}
           />
         )}
       </View>

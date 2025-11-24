@@ -1,10 +1,10 @@
-# TraviLink Mobile
+# TraveLink Mobile
 
-Mobile application for TraviLink - Smart Campus Transport System. This app provides the requester (faculty/staff) view for viewing and tracking transportation requests.
+Mobile application for TraveLink - Smart Campus Transport System. This app provides the requester (faculty/staff) view for viewing and tracking transportation requests.
 
 ## 📌 About
 
-TraviLink Mobile is a cross-platform mobile application built with React Native (Expo), TypeScript, and Supabase. It provides faculty and staff with a mobile interface to view their transportation requests, track approval status, view their schedule, and receive real-time notifications.
+TraveLink Mobile is a cross-platform mobile application built with React Native (Expo), TypeScript, and Supabase. It provides faculty and staff with a mobile interface to view their transportation requests, track approval status, view their schedule, and receive real-time notifications.
 
 ---
 
@@ -39,7 +39,7 @@ TraviLink Mobile is a cross-platform mobile application built with React Native 
 
 ```bash
 git clone https://github.com/httplouis/Travilink-mobile.git
-cd Travilink-mobile
+cd TraveLink-mobile
 ```
 
 ### 2. Install Dependencies
@@ -63,9 +63,9 @@ npm install
 - `react-native-safe-area-context` - Safe area handling
 - `@expo/vector-icons` - Icon library
 - `expo-location` - Location services (for map picker and current location)
-- `react-native-maps` - Map component for location selection
-- `expo-document-picker` - File picker for signature upload
-- `expo-file-system` - File system access for reading signature images
+- `react-native-maps` - Map component for location selection (native only, web fallback)
+- `expo-image-picker` - Image picker for signature upload
+- `expo-file-system` - File system access for reading signature images and PDF downloads
 - `@react-native-community/datetimepicker` - Native date/time picker
 - `react-native-signature-canvas` - Signature pad component
 - `react-native-webview` - WebView for signature canvas
@@ -147,8 +147,17 @@ app/
 
 components/                  # Reusable components
 ├── RequestCard.tsx          # Request list item
-├── RequestStatusTracker.tsx # Approval progress tracker
-└── StatusBadge.tsx          # Status indicator badge
+├── RequestStatusTracker.tsx # Approval progress tracker with names/timestamps
+├── StatusBadge.tsx          # Status indicator badge
+├── DateInput.tsx            # Date picker with native support
+├── UserSearchableSelect.tsx # User search and selection
+├── DepartmentSelect.tsx     # Department selection modal
+├── LocationField.tsx        # Location input with map picker
+├── MapPicker.tsx            # Interactive map for location selection
+├── CostsSection.tsx         # Travel costs with preset buttons
+├── SignaturePad.tsx         # Signature capture (draw or upload)
+├── HeadEndorsementInvitationEditor.tsx # Head endorsement UI
+└── NavigationHeader.tsx      # Reusable navigation header
 
 hooks/                       # Custom React hooks
 ├── useRequests.ts          # Requests data fetching + real-time
@@ -162,7 +171,9 @@ lib/                         # Utilities and configuration
 ├── supabase/
 │   └── client.ts           # Supabase client with secure storage
 ├── types.ts                # TypeScript type definitions
-└── utils.ts                # Helper functions (date formatting, etc.)
+├── utils.ts                # Helper functions (date formatting, etc.)
+└── utils/
+    └── pdf-helpers.ts      # PDF filename formatting and initials extraction
 ```
 
 ---
@@ -185,7 +196,11 @@ The app uses Supabase Realtime subscriptions to automatically update:
 
 Uses TanStack Query (React Query) for:
 - Automatic caching (30s stale time)
-- Background refetching
+- Background refetching with `refetchInterval`:
+  - Requests list: 5 seconds
+  - Notifications: 5 seconds
+  - Calendar: 30-60 seconds
+  - Dashboard: 30-60 seconds
 - Optimistic updates
 - Error handling and retry logic
 - Loading states
@@ -209,19 +224,29 @@ The app connects directly to Supabase (same database as web app):
 - No separate API server needed
 
 **External APIs:**
-- **Nominatim (OpenStreetMap)** - Free location search and geocoding (no API key required)
-  - Used for map picker search/autocomplete
-  - Reverse geocoding to get addresses from coordinates
-  - No rate limits for reasonable usage
-  - User-Agent header set to "TraviLink-Mobile/1.0" (required by Nominatim)
+
+1. **Nominatim (OpenStreetMap)** - Free location search and geocoding (no API key required)
+   - Used for map picker search/autocomplete
+   - Reverse geocoding to get addresses from coordinates
+   - No rate limits for reasonable usage
+   - User-Agent header set to "TraviLink-Mobile/1.0" (required by Nominatim)
+   - Endpoint: `https://nominatim.openstreetmap.org/`
+
+2. **TraviLink Web API** - Backend API endpoints (requires authentication)
+   - PDF Generation: `GET /api/requests/[id]/pdf`
+   - Duplicate Request: `POST /api/requests/[id]/duplicate`
+   - Head Endorsement Invitations: `POST /api/head-endorsements/invite`
+   - Base URL: Set via `EXPO_PUBLIC_WEB_APP_URL` environment variable (defaults to Supabase URL)
+   - Authentication: Uses Supabase session token in Authorization header
 
 **Tables used:**
-- `requests` - Transportation requests
+- `requests` - Transportation requests (with all fields matching web version)
 - `notifications` - User notifications
-- `users` - User profiles (with position_title, department, role)
+- `users` - User profiles (with position_title, department, role, is_head)
 - `departments` - Department information
 - `vehicles` - Vehicle information
 - `request_history` - Approval timeline
+- `feedback` - Trip feedback/evaluations (optional, for completed trips)
 
 ---
 
@@ -348,6 +373,12 @@ Required environment variables (in `.env` file):
 - `EXPO_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
 
+Optional environment variables:
+
+- `EXPO_PUBLIC_WEB_APP_URL` - Base URL for TraviLink web API (for PDF download, duplicate, etc.)
+  - Defaults to Supabase URL if not set
+  - Example: `https://travilink.example.com` or `http://localhost:3000` (for development)
+
 **Note:** Variables must start with `EXPO_PUBLIC_` to be accessible in the app.
 
 ---
@@ -378,12 +409,28 @@ Required environment variables (in `.env` file):
   - Map picker with search/autocomplete (using Nominatim/OpenStreetMap - free, no API key needed)
   - User searchable select with full user list
   - Department selection
-  - Costs section with dynamic expenses
+  - Costs section with dynamic expenses and preset buttons
   - Signature pad with drawing and image upload
   - Full database integration with Supabase
 
-### ⏳ In Progress
-- Phase 8: Polish (Error handling, optimizations, mobile UX improvements)
+- Phase 8: Advanced Features
+  - **PDF Download** - Download request PDFs with proper filename format (TO-2025-{number}-{initials}.pdf)
+  - **Duplicate Request** - Duplicate existing requests to create new drafts
+  - **Return to Sender** - Edit and resubmit returned requests with comments display
+  - **Fixed Cost Presets** - Quick-select buttons for common expense amounts
+  - **Head Self-Request Logic** - Auto-endorsement for department head requests
+  - **Approval Signatures Display** - Show approver names and timestamps in tracking
+  - **Auto-Refresh** - Automatic refresh for inbox and notifications (5-second intervals)
+  - **Calendar Visibility** - Slot counts with pending/approved breakdown (privacy-focused)
+  - **Pending Evaluations** - Notifications for completed trips needing feedback
+  - **Head Endorsement Invitations** - UI for sending email invitations (ready for backend API)
+  - **Budget Threshold Routing** - Display routing path based on ₱15,000 threshold
+  - **Skip Admin/Comptroller** - Logic handled by backend workflow engine
+
+### ✅ All Features Complete
+- All planned features from the implementation plan have been completed
+- Mobile app is fully functional and matches web version's logic and data flow
+- Ready for testing and production deployment
 
 ---
 

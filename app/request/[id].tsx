@@ -19,15 +19,36 @@ import StatusBadge from '@/components/StatusBadge';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils';
 import { useRequestTracking } from '@/hooks/useRequestTracking';
+import { useRequestPDF } from '@/hooks/useRequestPDF';
+import { useDuplicateRequest } from '@/hooks/useDuplicateRequest';
+import { useAuth } from '@/contexts/AuthContext';
+import ApprovalActions from '@/components/ApprovalActions';
+import { isComptroller } from '@/lib/utils/navigation';
 
 export default function RequestDetailsScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'tracking'>(tab === 'tracking' ? 'tracking' : 'details');
+  const [showApprovalActions, setShowApprovalActions] = useState(false);
 
   // Use the tracking hook which fetches all related data
   const { data: trackingData, isLoading: isLoadingTracking, error: trackingError, refetch: refetchTracking } = useRequestTracking(id || '');
+  
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+  // PDF download hook - use stable values to prevent hooks error
+  const { downloadPDF, downloading: downloadingPDF } = useRequestPDF({
+    requestId: id || '',
+    requestNumber: trackingData?.request?.request_number ?? null,
+    requesterName: trackingData?.request?.requester_name ?? null,
+    requestType: (trackingData?.request?.request_type as 'travel_order' | 'seminar' | null) ?? null,
+  });
+
+  // Duplicate request hook
+  const { duplicateRequest, duplicating } = useDuplicateRequest({
+    requestId: id || '',
+  });
   
   const request = trackingData?.request;
   const isLoading = isLoadingTracking;
@@ -69,6 +90,26 @@ export default function RequestDetailsScreen() {
 
   const hasParentHead = !!request?.parent_department_id;
   const requiresPresidentApproval = (request?.total_budget || 0) > 50000;
+
+  // Determine if user can approve this request
+  const canApprove = profile && (() => {
+    if (profile.is_head && request.status === 'pending_head' && !request.head_approved_at) {
+      return { canApprove: true, role: 'head' as const };
+    }
+    if (profile.is_vp && request.status === 'pending_vp' && !request.vp_approved_at) {
+      return { canApprove: true, role: 'vp' as const };
+    }
+    if (profile.is_president && request.status === 'pending_president' && !request.president_approved_at) {
+      return { canApprove: true, role: 'president' as const };
+    }
+    if (profile.is_hr && request.status === 'pending_hr' && !request.hr_approved_at) {
+      return { canApprove: true, role: 'hr' as const };
+    }
+    if (isComptroller(profile.email) && request.status === 'pending_comptroller' && !request.comptroller_approved_at) {
+      return { canApprove: true, role: 'comptroller' as const };
+    }
+    return { canApprove: false, role: null };
+  })();
   
   // Get approver names from tracking data
   const headApproverName = trackingData?.headApprover?.name || null;
@@ -126,6 +167,53 @@ export default function RequestDetailsScreen() {
               <Ionicons name="location" size={16} color="#6b7280" />
               <Text style={styles.headerCardDetailText}>{request.destination}</Text>
             </View>
+          </View>
+          
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.pdfButton]}
+              onPress={downloadPDF}
+              disabled={downloadingPDF}
+            >
+              <Ionicons 
+                name={downloadingPDF ? "hourglass-outline" : "download-outline"} 
+                size={18} 
+                color="#fff" 
+              />
+              <Text style={styles.actionButtonText}>
+                {downloadingPDF ? 'Downloading...' : 'Download PDF'}
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Duplicate Button - only show for user's own requests */}
+            {request.status === 'draft' || request.status === 'approved' || request.status === 'rejected' ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.duplicateButton]}
+                onPress={duplicateRequest}
+                disabled={duplicating}
+              >
+                <Ionicons 
+                  name={duplicating ? "hourglass-outline" : "copy-outline"} 
+                  size={18} 
+                  color="#7a0019" 
+                />
+                <Text style={[styles.actionButtonText, styles.duplicateButtonText]}>
+                  {duplicating ? 'Duplicating...' : 'Duplicate'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Approval Button - show if user can approve */}
+            {canApprove.canApprove && canApprove.role !== 'comptroller' && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.approveButton]}
+                onPress={() => setShowApprovalActions(true)}
+              >
+                <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Review & Approve</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -492,6 +580,40 @@ const styles = StyleSheet.create({
   headerCardDetailText: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  pdfButton: {
+    backgroundColor: '#7a0019',
+  },
+  duplicateButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#7a0019',
+  },
+  approveButton: {
+    backgroundColor: '#16a34a',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  duplicateButtonText: {
+    color: '#7a0019',
   },
   tabs: {
     flexDirection: 'row',

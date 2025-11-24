@@ -222,6 +222,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await Promise.race([sessionPromise, sessionTimeoutPromise]);
         const { data: { session }, error } = result || { data: { session: null }, error: null };
         
+        // Handle refresh token errors
+        if (error && (error.message?.includes('refresh_token') || error.message?.includes('Refresh Token'))) {
+          console.warn('[AuthContext] Refresh token error, clearing session:', error.message);
+          // Clear invalid session
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            // Ignore sign out errors
+          }
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+          }
+          return;
+        }
+        
         if (timeoutId) {
           clearTimeout(timeoutId);
           timeoutId = null;
@@ -281,6 +299,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[AuthContext] Auth state changed:', event, session?.user?.email || 'no user');
       
+      // Handle refresh token errors
+      if (event === 'SIGNED_OUT' && !session) {
+        // If signed out due to invalid refresh token, clear state
+        console.log('[AuthContext] Session expired or invalid, clearing state');
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        if (mounted) {
+          setLoading(false);
+        }
+        return;
+      }
+      
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -299,9 +330,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         } else {
           // For other events (like TOKEN_REFRESHED), fetch normally
-          const userProfile = await fetchProfile(session.user.id);
-          if (mounted) {
-            setProfile(userProfile);
+          try {
+            const userProfile = await fetchProfile(session.user.id);
+            if (mounted) {
+              setProfile(userProfile);
+            }
+          } catch (error) {
+            console.error('[AuthContext] Profile fetch error:', error);
+            // Continue without profile update
           }
         }
       } else {

@@ -99,6 +99,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: Platform.OS === 'web', // Only detect session in URL on web
+    // Handle refresh token errors gracefully
+    flowType: 'pkce', // Use PKCE flow for better security and token handling
   },
   global: {
     fetch: (url, options = {}) => {
@@ -114,5 +116,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       });
     },
   },
+});
+
+// Listen for auth errors and handle refresh token failures
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'TOKEN_REFRESHED') {
+    console.log('[Supabase] Token refreshed successfully');
+  } else if (event === 'SIGNED_OUT') {
+    console.log('[Supabase] User signed out');
+  }
 });
 

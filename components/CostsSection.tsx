@@ -151,8 +151,22 @@ export default function CostsSection({
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Food */}
         <View style={styles.fieldGroup}>
+          <View style={styles.labelRow}>
+            <Text style={styles.fieldLabel}>Food</Text>
+            <View style={styles.presetContainer}>
+              {[500, 1000, 1500, 2000].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  style={styles.presetButton}
+                  onPress={() => onChangeCosts({ food: preset })}
+                >
+                  <Text style={styles.presetText}>₱{preset.toLocaleString()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
           <CurrencyInput
-            label="Food"
+            label=""
             placeholder="0.00"
             value={costs?.food ?? ''}
             onChange={(value) => handleCurrencyChange(value, 'food', 'Food')}
@@ -170,8 +184,22 @@ export default function CostsSection({
 
         {/* Driver's Allowance */}
         <View style={styles.fieldGroup}>
+          <View style={styles.labelRow}>
+            <Text style={styles.fieldLabel}>Driver's allowance</Text>
+            <View style={styles.presetContainer}>
+              {[300, 500, 800, 1000].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  style={styles.presetButton}
+                  onPress={() => onChangeCosts({ driversAllowance: preset })}
+                >
+                  <Text style={styles.presetText}>₱{preset.toLocaleString()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
           <CurrencyInput
-            label="Driver's allowance"
+            label=""
             placeholder="0.00"
             value={costs?.driversAllowance ?? ''}
             onChange={(value) => handleCurrencyChange(value, 'driversAllowance', "Driver's Allowance")}
@@ -396,6 +424,35 @@ const styles = StyleSheet.create({
   fieldGroup: {
     marginBottom: 16,
     gap: 8,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  presetContainer: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  presetButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#fff',
+  },
+  presetText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
   },
   descriptionInput: {
     fontSize: 14,

@@ -69,6 +69,20 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="inbox"
+          options={{
+            title: 'Inbox',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "mail" : "mail-outline"} size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="budget-review"
+          options={{
+            title: 'Budget Review',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "calculator" : "calculator-outline"} size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="request"
           options={{
             title: 'Request',

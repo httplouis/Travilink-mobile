@@ -11,6 +11,7 @@ interface RequestCardProps {
   onPress: () => void;
   onViewDetails?: () => void;
   onViewTracking?: () => void;
+  needsFeedback?: boolean;
 }
 
 export default function RequestCard({
@@ -18,17 +19,28 @@ export default function RequestCard({
   onPress,
   onViewDetails,
   onViewTracking,
+  needsFeedback = false,
 }: RequestCardProps) {
   const hasParentHead = !!request.parent_department_id;
   const requiresPresidentApproval = (request.total_budget || 0) > 50000;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity 
+      style={[styles.card, needsFeedback && styles.cardNeedsFeedback]} 
+      onPress={onPress} 
+      activeOpacity={0.7}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.requestNumber}>{request.request_number}</Text>
           <StatusBadge status={request.status} size="sm" />
+          {needsFeedback && (
+            <View style={styles.feedbackBadge}>
+              <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
+              <Text style={styles.feedbackBadgeText}>Needs Feedback</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -138,6 +150,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  cardNeedsFeedback: {
+    borderColor: '#f59e0b',
+    borderWidth: 2,
+    backgroundColor: '#fffbeb',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -148,6 +165,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexWrap: 'wrap',
+  },
+  feedbackBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  feedbackBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
   },
   requestNumber: {
     fontSize: 16,

@@ -18,8 +18,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-import * as AuthSession from 'expo-auth-session';
+import { router, useLocalSearchParams } from 'expo-router';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -29,6 +28,15 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   
   const { signIn } = useAuth();
+  const params = useLocalSearchParams();
+
+  // Check for error from OAuth callback
+  React.useEffect(() => {
+    if (params.error) {
+      const errorParam = decodeURIComponent(params.error as string);
+      setError(errorParam);
+    }
+  }, [params.error]);
 
   // Check if email is a student email
   const isStudentEmail = (email: string) => {
@@ -67,8 +75,11 @@ export default function SignInScreen() {
       });
 
       if (oauthError) {
-        console.error('[sign-in] OAuth error:', oauthError);
-        setError(oauthError.message || 'Failed to connect to Microsoft');
+        // Log for debugging only
+        if (__DEV__) {
+          console.log('[sign-in] OAuth error:', oauthError);
+        }
+        setError('Failed to connect to Microsoft. Please try again or use email/password login.');
         setLoading(false);
         return;
       }
@@ -122,8 +133,22 @@ export default function SignInScreen() {
               }
               
               if (error) {
-                console.error('[sign-in] OAuth error in callback:', error);
-                setError(`Authentication failed: ${error}`);
+                // Log for debugging only (don't expose raw error to users)
+                if (__DEV__) {
+                  console.log('[sign-in] OAuth callback error:', error);
+                }
+                
+                // Provide user-friendly error messages
+                let errorMessage = 'Authentication failed. Please try again.';
+                if (error === 'server_error') {
+                  errorMessage = 'Microsoft authentication service is temporarily unavailable. Please try again later or use email/password login.';
+                } else if (error === 'access_denied') {
+                  errorMessage = 'Authentication was cancelled. Please try again.';
+                } else if (error === 'invalid_request') {
+                  errorMessage = 'Invalid authentication request. Please try again.';
+                }
+                
+                setError(errorMessage);
                 setLoading(false);
                 return;
               }
@@ -240,7 +265,7 @@ export default function SignInScreen() {
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>TL</Text>
             </View>
-            <Text style={styles.title}>TraviLink</Text>
+            <Text style={styles.title}>TraveLink</Text>
             <Text style={styles.subtitle}>Smart Campus Transport System</Text>
           </View>
 

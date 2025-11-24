@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -13,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Platform } from 'react-native';
 import NavigationHeader from '@/components/NavigationHeader';
 import CustomTabBar from '@/components/CustomTabBar';
+import SignatureSettings from '@/components/SignatureSettings';
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuth();
@@ -41,7 +43,10 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => router.push('/profile')}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="person-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Edit Profile</Text>
@@ -49,13 +54,27 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => {
+            // TODO: Implement change password screen
+            Alert.alert('Coming Soon', 'Password change feature will be available soon.');
+          }}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Change Password</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
+      </View>
+
+      {/* Digital Signature Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Digital Signature</Text>
+        <View style={styles.signatureSection}>
+          <SignatureSettings />
+        </View>
       </View>
 
       {/* Notifications Section */}
@@ -93,7 +112,10 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>App</Text>
         
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => router.push('/help')}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="help-circle-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Help & Support</Text>
@@ -101,7 +123,12 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => {
+            Alert.alert('Terms & Privacy', 'Terms and Privacy policy will be available soon.');
+          }}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="document-text-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>Terms & Privacy</Text>
@@ -109,7 +136,15 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => {
+            Alert.alert(
+              'About TraveLink',
+              'TraveLink Mobile v1.0.0\n\nSmart Campus Transport System\n\n© 2025 MSEUF'
+            );
+          }}
+        >
           <View style={styles.settingLeft}>
             <Ionicons name="information-circle-outline" size={20} color="#6b7280" />
             <Text style={styles.settingLabel}>About</Text>
@@ -119,9 +154,20 @@ export default function SettingsScreen() {
       </View>
 
 
+      {/* Sign Out Section */}
+      <View style={styles.section}>
+        <TouchableOpacity 
+          style={styles.signOutButton}
+          onPress={handleSignOut}
+        >
+          <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Version */}
       <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>TraviLink Mobile v1.0.0</Text>
+        <Text style={styles.versionText}>TraveLink Mobile v1.0.0</Text>
       </View>
       
       {/* Bottom padding to account for navbar */}
@@ -200,6 +246,10 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  signatureSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
 });
 

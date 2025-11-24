@@ -54,7 +54,8 @@ export default function AuthCallback() {
         }
         
         // On web, also check window.location.hash (fallback)
-        if (Platform.OS === 'web' && typeof window !== 'undefined' && !hashParams) {
+        if (Platform.OS === 'web' && typeof (global as any).window !== 'undefined' && !hashParams) {
+          const window = (global as any).window;
           const hash = window.location.hash;
           if (hash && hash.length > 1) {
             hashParams = new URLSearchParams(hash.substring(1));
@@ -70,9 +71,23 @@ export default function AuthCallback() {
         }
         
         if (error) {
-          console.error('[auth/callback] Error:', error);
+          // Log for debugging only (don't expose raw error to users)
+          if (__DEV__) {
+            console.log('[auth/callback] Error:', error);
+          }
           hasProcessedRef.current = true;
-          router.replace('/(auth)/sign-in?error=' + encodeURIComponent(error));
+          
+          // Provide user-friendly error messages
+          let errorMessage = 'Authentication failed. Please try again.';
+          if (error === 'server_error') {
+            errorMessage = 'Microsoft authentication service is temporarily unavailable. Please try again later or use email/password login.';
+          } else if (error === 'access_denied') {
+            errorMessage = 'Authentication was cancelled. Please try again.';
+          } else if (error === 'invalid_request') {
+            errorMessage = 'Invalid authentication request. Please try again.';
+          }
+          
+          router.replace('/(auth)/sign-in?error=' + encodeURIComponent(errorMessage));
           return;
         }
 
@@ -95,15 +110,69 @@ export default function AuthCallback() {
             refreshToken = (params.refresh_token as string) || '';
           }
           
+          // If no refresh token, try to get session from Supabase (it might have it stored)
+          if (!refreshToken) {
+            console.warn('[auth/callback] No refresh_token in callback, Supabase will handle token refresh');
+          }
+          
+          // setSession requires both tokens, so if we don't have refresh_token, use code exchange instead
+          if (!refreshToken && code) {
+            console.log('[auth/callback] No refresh_token, using code exchange instead...');
+            const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError || !exchangeData.session) {
+              console.error('[auth/callback] Code exchange failed:', exchangeError);
+              hasProcessedRef.current = true;
+              router.replace('/(auth)/sign-in?error=' + encodeURIComponent(exchangeError?.message || 'code_exchange_failed'));
+              return;
+            }
+            // Continue with exchangeData.session below
+            const verifyData = await supabase.auth.getSession();
+            if (verifyData.data.session) {
+              hasProcessedRef.current = true;
+              router.replace('/(tabs)/dashboard');
+              return;
+            }
+          }
+          
+          // If we have both tokens, use setSession
+          if (!refreshToken) {
+            console.error('[auth/callback] Missing refresh_token and no code available');
+            hasProcessedRef.current = true;
+            router.replace('/(auth)/sign-in?error=missing_refresh_token');
+            return;
+          }
+          
           const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
-          if (sessionError || !sessionData.session) {
+          if (sessionError) {
+            // If refresh token error, try to exchange code instead if available
+            if (sessionError.message?.includes('refresh_token') && code) {
+              console.log('[auth/callback] Refresh token error, trying code exchange instead...');
+              const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              if (!exchangeError && exchangeData.session) {
+                console.log('[auth/callback] Code exchange successful');
+                // Continue with exchangeData.session
+                const verifyData = await supabase.auth.getSession();
+                if (verifyData.data.session) {
+                  hasProcessedRef.current = true;
+                  router.replace('/(tabs)/dashboard');
+                  return;
+                }
+              }
+            }
             console.error('[auth/callback] Failed to set session:', sessionError);
             hasProcessedRef.current = true;
             router.replace('/(auth)/sign-in?error=' + encodeURIComponent(sessionError?.message || 'failed_to_set_session'));
+            return;
+          }
+          
+          if (!sessionData.session) {
+            console.error('[auth/callback] No session in response');
+            hasProcessedRef.current = true;
+            router.replace('/(auth)/sign-in?error=no_session');
             return;
           }
 
@@ -119,7 +188,8 @@ export default function AuthCallback() {
             console.log('[auth/callback] Session verified, redirecting to dashboard...');
             
             // Clear hash on web
-            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            if (Platform.OS === 'web' && typeof (global as any).window !== 'undefined') {
+              const window = (global as any).window;
               window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
             
