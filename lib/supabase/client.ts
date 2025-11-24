@@ -149,9 +149,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       }).finally(() => {
         clearTimeout(timeoutId);
       }).catch((error) => {
-        // Don't throw on timeout for auth requests - let Supabase handle retries
+        // Suppress abort errors for auth requests - they're handled internally by Supabase
         if (error.name === 'AbortError' && isAuthRequest) {
-          console.warn('[Supabase] Auth request timeout, but continuing...');
+          // Don't log - Supabase will retry internally
+          // Re-throw but don't log noisy errors
+          throw error;
         }
         throw error;
       });

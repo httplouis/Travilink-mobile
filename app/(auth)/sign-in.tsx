@@ -75,11 +75,26 @@ export default function SignInScreen() {
       });
 
       if (oauthError) {
-        // Log for debugging only
-        if (__DEV__) {
-          console.log('[sign-in] OAuth error:', oauthError);
+        // Handle abort errors gracefully - don't show them to users
+        const errorMessage = oauthError.message || '';
+        const isAbortError = errorMessage.includes('Aborted') || 
+                            errorMessage.includes('abort') || 
+                            oauthError.name === 'AbortError' ||
+                            errorMessage.includes('AuthRetryableFetchError');
+        
+        if (isAbortError) {
+          // Abort errors are usually from timeouts - silently retry or show generic message
+          if (__DEV__) {
+            console.log('[sign-in] OAuth request aborted (likely timeout), user can retry');
+          }
+          setError('Connection timed out. Please check your internet and try again.');
+        } else {
+          // Log other errors for debugging
+          if (__DEV__) {
+            console.log('[sign-in] OAuth error:', oauthError);
+          }
+          setError('Failed to connect to Microsoft. Please try again or use email/password login.');
         }
-        setError('Failed to connect to Microsoft. Please try again or use email/password login.');
         setLoading(false);
         return;
       }
@@ -200,8 +215,24 @@ export default function SignInScreen() {
       }
       
     } catch (err: any) {
-      console.error('[sign-in] Microsoft login error:', err);
-      setError(err.message || 'An error occurred');
+      // Handle abort errors gracefully
+      const errorMessage = err?.message || '';
+      const isAbortError = errorMessage.includes('Aborted') || 
+                          errorMessage.includes('abort') || 
+                          err?.name === 'AbortError' ||
+                          errorMessage.includes('AuthRetryableFetchError');
+      
+      if (isAbortError) {
+        // Don't log abort errors - they're noise
+        if (__DEV__) {
+          console.log('[sign-in] Request aborted (likely timeout)');
+        }
+        setError('Connection timed out. Please check your internet and try again.');
+      } else {
+        // Log other errors
+        console.error('[sign-in] Microsoft login error:', err);
+        setError(err.message || 'An error occurred. Please try again.');
+      }
       setLoading(false);
     }
   };

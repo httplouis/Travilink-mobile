@@ -264,7 +264,24 @@ export default function AuthCallback() {
         const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
 
         if (sessionError) {
-          // Log the error for debugging
+          // Handle abort errors gracefully
+          const errorMessage = sessionError?.message || '';
+          const isAbortError = errorMessage.includes('Aborted') || 
+                              errorMessage.includes('abort') || 
+                              sessionError?.name === 'AbortError' ||
+                              errorMessage.includes('AuthRetryableFetchError');
+          
+          if (isAbortError) {
+            // Don't log abort errors - they're noise
+            if (__DEV__) {
+              console.log('[auth/callback] Code exchange aborted (likely timeout)');
+            }
+            hasProcessedRef.current = true;
+            router.replace('/(auth)/sign-in?error=' + encodeURIComponent('Connection timed out. Please check your internet and try again.'));
+            return;
+          }
+          
+          // Log other errors for debugging
           if (__DEV__) {
             console.error('[auth/callback] Code exchange error:', sessionError);
             console.error('[auth/callback] Error message:', sessionError.message);
@@ -320,9 +337,26 @@ export default function AuthCallback() {
           router.replace('/(auth)/sign-in?error=no_session');
         }
       } catch (err: any) {
-        console.error('[auth/callback] Unexpected error:', err);
-        hasProcessedRef.current = true;
-        router.replace('/(auth)/sign-in?error=' + encodeURIComponent(err.message || 'unexpected_error'));
+        // Handle abort errors gracefully - don't log them
+        const errorMessage = err?.message || '';
+        const isAbortError = errorMessage.includes('Aborted') || 
+                            errorMessage.includes('abort') || 
+                            err?.name === 'AbortError' ||
+                            errorMessage.includes('AuthRetryableFetchError');
+        
+        if (isAbortError) {
+          // Abort errors are usually from timeouts or network issues - don't log
+          if (__DEV__) {
+            console.log('[auth/callback] Request aborted (likely timeout), redirecting to sign-in');
+          }
+          hasProcessedRef.current = true;
+          router.replace('/(auth)/sign-in?error=' + encodeURIComponent('Connection timed out. Please check your internet and try again.'));
+        } else {
+          // Log other errors
+          console.error('[auth/callback] Unexpected error:', err);
+          hasProcessedRef.current = true;
+          router.replace('/(auth)/sign-in?error=' + encodeURIComponent(err.message || 'unexpected_error'));
+        }
       } finally {
         isProcessingRef.current = false;
       }
