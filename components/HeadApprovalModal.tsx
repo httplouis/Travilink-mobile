@@ -1156,12 +1156,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
   },
-  signatureHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
   signatureLabel: {
     fontSize: 14,
     fontWeight: '600',

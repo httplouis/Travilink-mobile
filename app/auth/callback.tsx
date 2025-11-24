@@ -255,13 +255,27 @@ export default function AuthCallback() {
         console.log('[auth/callback] Exchanging code for session...');
         console.log('[auth/callback] Code length:', code.length);
         
-        // CRITICAL FIX: Wait a moment to ensure storage is ready
-        // Sometimes the code verifier hasn't been fully persisted when we try to exchange
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Add timeout to code exchange (max 15 seconds for slow networks)
+        const exchangeTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Code exchange timeout')), 15000)
+        );
         
         // Try to exchange the code - Supabase should automatically retrieve the code verifier
         // The code verifier is stored when signInWithOAuth is called with the same redirect URL
-        const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+        let exchangeResult;
+        try {
+          exchangeResult = await Promise.race([
+            supabase.auth.exchangeCodeForSession(code),
+            exchangeTimeout
+          ]);
+        } catch (timeoutError) {
+          console.error('[auth/callback] Code exchange timeout');
+          hasProcessedRef.current = true;
+          router.replace('/(auth)/sign-in?error=' + encodeURIComponent('Authentication timed out. Please try again.'));
+          return;
+        }
+        
+        const { data, error: sessionError } = exchangeResult as any;
 
         if (sessionError) {
           // Handle abort errors gracefully
@@ -300,11 +314,28 @@ export default function AuthCallback() {
             console.error('[auth/callback] 2. The storage adapter failed to persist the code verifier');
             console.error('[auth/callback] 3. The code verifier was cleared before the callback');
             
-            // Try one more time after a longer delay (storage might need more time)
+            // Try one more time after a short delay (storage might need more time on slow devices)
             console.log('[auth/callback] Retrying after delay...');
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 1000ms to 500ms
             
-            const { data: retryData, error: retryError } = await supabase.auth.exchangeCodeForSession(code);
+            const retryTimeout = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Retry timeout')), 10000)
+            );
+            
+            let retryResult;
+            try {
+              retryResult = await Promise.race([
+                supabase.auth.exchangeCodeForSession(code),
+                retryTimeout
+              ]);
+            } catch (retryTimeoutError) {
+              console.error('[auth/callback] Retry also timed out');
+              hasProcessedRef.current = true;
+              router.replace('/(auth)/sign-in?error=' + encodeURIComponent('Authentication timed out. Please try again.'));
+              return;
+            }
+            
+            const { data: retryData, error: retryError } = retryResult as any;
             if (retryError) {
               console.error('[auth/callback] Retry also failed:', retryError);
               hasProcessedRef.current = true;

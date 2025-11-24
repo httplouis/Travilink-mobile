@@ -228,6 +228,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Get initial session with timeout
     const initializeAuth = async () => {
+      // Declare validSession outside try block so it's accessible in finally
+      let validSession: Session | null = null;
+      
       try {
         // Set a timeout to prevent infinite loading
         timeoutId = setTimeout(() => {
@@ -246,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         // Validate session - check if it's expired or invalid
-        let validSession = session;
+        validSession = session;
         if (session) {
           // Check if session is expired
           const expiresAt = session.expires_at;
