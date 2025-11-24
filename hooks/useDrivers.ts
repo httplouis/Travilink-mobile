@@ -2,77 +2,95 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 
 export interface Driver {
-  id: string; // Use user_id as id for component compatibility
-  user_id: string;
-  license_number: string | null;
-  license_expiry: string | null;
-  status: string;
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    profile_picture: string | null;
-    position_title: string | null;
-    status: string;
-  };
+  id: string;
+  name: string;
+  email: string;
+  phone_number?: string;
+  profile_picture?: string;
+  status?: string;
+  position_title?: string;
 }
 
-export function useDrivers(filters?: { status?: string; available?: boolean }) {
-  const { data, isLoading, error, refetch } = useQuery({
+export function useDrivers(filters?: { status?: string }) {
+  return useQuery({
     queryKey: ['drivers', filters],
     queryFn: async (): Promise<Driver[]> => {
-      let query = supabase
-        .from('drivers')
-        .select(`
-          user_id,
-          license_no,
-          license_expiry,
-          user:users!drivers_user_id_fkey(
-            id,
-            name,
-            email,
-            profile_picture,
-            position_title,
-            status,
-            created_at
-          )
-        `)
-        .order('user.created_at', { ascending: false });
+      console.log('[useDrivers] 🔍 Fetching drivers with filters:', filters);
+      
+      // Try WITHOUT status filter first (most reliable), then with filter if needed
+      let allDrivers: Driver[] = [];
+      let attemptWithStatus = false;
+      const wantsStatusFilter = filters?.status === 'active' || filters?.status === 'inactive';
+      
+      while (true) {
+        let query = supabase
+          .from('users')
+          .select('id, name, email, phone_number, profile_picture, status, position_title')
+          .eq('role', 'driver')
+          .order('name', { ascending: true });
 
-      // Apply filters on user status (drivers table doesn't have status field)
-      if (filters?.status) {
-        query = query.eq('user.status', filters.status);
+        // Only apply status filter if user explicitly requested it AND we haven't tried without it yet
+        // Start without status filter to avoid RLS issues
+        if (wantsStatusFilter && attemptWithStatus && filters?.status) {
+          if (filters.status === 'active') {
+            query = query.eq('status', 'active');
+            console.log('[useDrivers] 🔎 Filtering by status: active');
+          } else if (filters.status === 'inactive') {
+            query = query.eq('status', 'inactive');
+            console.log('[useDrivers] 🔎 Filtering by status: inactive');
+          }
+        } else {
+          console.log('[useDrivers] 📋 Fetching ALL drivers (no status filter)');
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('[useDrivers] ❌ Query error:', error);
+          console.error('[useDrivers] Error details:', JSON.stringify(error, null, 2));
+          
+          // If we got an error and haven't tried with status filter yet, try it
+          if (wantsStatusFilter && !attemptWithStatus) {
+            console.log('[useDrivers] 🔄 Retrying with status filter due to error...');
+            attemptWithStatus = true;
+            continue; // Retry with status filter
+          }
+          throw error;
+        }
+        
+        allDrivers = (data || []) as Driver[];
+        console.log('[useDrivers] ✅ Fetched drivers:', allDrivers.length);
+        
+        // If user wants status filter but we got results without it, try with filter
+        if (wantsStatusFilter && !attemptWithStatus && allDrivers.length > 0) {
+          console.log('[useDrivers] 🔄 Got drivers without filter, now trying with status filter as requested...');
+          attemptWithStatus = true;
+          continue; // Retry with status filter
+        }
+        
+        // If we got no results and user wants status filter, try without it
+        if (allDrivers.length === 0 && wantsStatusFilter && attemptWithStatus) {
+          console.log('[useDrivers] ⚠️ No drivers found with status filter, trying without status filter...');
+          attemptWithStatus = false;
+          continue; // Retry without status filter
+        }
+        
+        // We got results or already tried both ways, break
+        break;
       }
-
-      // If available filter is true, only get drivers with user status 'active'
-      if (filters?.available) {
-        query = query.eq('user.status', 'active');
+      
+      if (allDrivers.length > 0) {
+        console.log('[useDrivers] Sample drivers:', allDrivers.slice(0, 3).map(d => d.name));
+      } else {
+        console.warn('[useDrivers] ⚠️ No drivers returned from query');
       }
-
-      const { data: drivers, error: driversError } = await query;
-
-      if (driversError) {
-        console.error('[useDrivers] Error fetching drivers:', driversError);
-        throw driversError;
-      }
-
-      // Transform to match Driver interface (use user_id as id for component compatibility)
-      return (drivers || []).map((d: any) => ({
-        id: d.user_id, // Use user_id as id for component compatibility
-        user_id: d.user_id,
-        license_number: d.license_no || null, // Map license_no to license_number
-        license_expiry: d.license_expiry || null,
-        status: d.user?.status || 'active',
-        user: d.user || null,
-      })) as Driver[];
+      
+      return allDrivers;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 0, // Don't cache - always fetch fresh data
+    gcTime: 0, // Don't keep in cache
+    refetchInterval: 60000, // Refresh every minute
+    refetchOnMount: true, // Always refetch when component mounts
   });
-
-  return {
-    drivers: data || [],
-    isLoading,
-    error,
-    refetch,
-  };
 }
+

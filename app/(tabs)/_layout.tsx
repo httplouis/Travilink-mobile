@@ -51,6 +51,8 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: { display: 'none' }, // Hide default tab bar
+          animation: 'none', // Disable swipe animation
+          animationEnabled: false, // Disable animation
         }}
       >
         {/* ONLY 5 TABS - EXPLICITLY DEFINED */}

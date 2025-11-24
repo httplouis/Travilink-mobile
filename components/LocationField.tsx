@@ -20,6 +20,7 @@ interface LocationFieldProps {
   error?: string;
   disabled?: boolean;
   inputId?: string;
+  showMapPreview?: boolean; // Option to hide map preview (for custom placement)
 }
 
 export default function LocationField({
@@ -32,6 +33,7 @@ export default function LocationField({
   error,
   disabled = false,
   inputId,
+  showMapPreview = true, // Default to showing map preview
 }: LocationFieldProps) {
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
 
@@ -85,11 +87,72 @@ export default function LocationField({
           </TouchableOpacity>
         )}
       </View>
-      {geo?.lat != null && geo?.lng != null && (
-        <Text style={styles.geoText}>
-          Selected: {geo.lat.toFixed(5)}, {geo.lng.toFixed(5)}
-        </Text>
-      )}
+      {/* Map Preview - Use WebView Leaflet.js (works everywhere, no native module) */}
+      {showMapPreview && geo?.lat != null && geo?.lng != null && (() => {
+        let WebView: any = null;
+        if (Platform.OS !== 'web') {
+          try {
+            WebView = require('react-native-webview').WebView;
+          } catch (error) {
+            console.warn('react-native-webview not available');
+          }
+        }
+
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+              <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+              <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+              <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body, html { width: 100%; height: 100%; overflow: hidden; }
+                #map { width: 100%; height: 100%; }
+              </style>
+            </head>
+            <body>
+              <div id="map"></div>
+              <script>
+                const map = L.map('map').setView([${geo.lat}, ${geo.lng}], 15);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                  attribution: '© OpenStreetMap contributors',
+                  maxZoom: 19
+                }).addTo(map);
+                L.marker([${geo.lat}, ${geo.lng}]).addTo(map)
+                  .bindPopup('${(value || 'Selected location').replace(/'/g, "\\'")}')
+                  .openPopup();
+              </script>
+            </body>
+          </html>
+        `;
+
+        return (
+          <View style={styles.mapPreviewContainer}>
+            <Text style={styles.mapPreviewLabel}>📍 Selected Location</Text>
+            <View style={styles.mapPreview}>
+              {Platform.OS !== 'web' && WebView ? (
+                <WebView
+                  style={styles.mapPreviewMap}
+                  source={{ html: htmlContent }}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  scrollEnabled={false}
+                  showsHorizontalScrollIndicator={false}
+                  showsVerticalScrollIndicator={false}
+                />
+              ) : (
+                <View style={styles.mapPreviewFallback}>
+                  <Ionicons name="map-outline" size={32} color="#7a0019" />
+                  <Text style={styles.mapPreviewCoords}>
+                    {geo.lat.toFixed(6)}, {geo.lng.toFixed(6)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        );
+      })()}
       
       {/* Map Picker Modal - Only render when open to prevent infinite loops */}
       {isMapPickerOpen && (
@@ -180,6 +243,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#dc2626',
+  },
+  mapPreviewContainer: {
+    marginTop: 8,
+    gap: 6,
+  },
+  mapPreviewLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  mapPreview: {
+    height: 280,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapPreviewMap: {
+    width: '100%',
+    height: '100%',
+  },
+  mapPreviewFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f9fafb',
+  },
+  mapPreviewCoords: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 });
 

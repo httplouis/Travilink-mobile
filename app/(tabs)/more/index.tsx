@@ -117,33 +117,34 @@ export default function MoreScreen() {
                 </View>
               )}
             </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profile.name}</Text>
-              <Text style={styles.profileEmail} numberOfLines={1}>
-                {profile.email}
-              </Text>
-              {(() => {
-                // Priority: role badges > position_title > role
-                if (profile.is_president) return <Text style={styles.profileRole}>President</Text>;
-                if (profile.is_vp) return <Text style={styles.profileRole}>Vice President</Text>;
-                if (profile.is_exec) return <Text style={styles.profileRole}>Executive</Text>;
-                if (profile.is_hr) return <Text style={styles.profileRole}>Human Resources</Text>;
-                if (profile.is_head) return <Text style={styles.profileRole}>Department Head</Text>;
-                if (profile.role === 'admin') return <Text style={styles.profileRole}>Administrator</Text>;
-                if (profile.role === 'driver') return <Text style={styles.profileRole}>Driver</Text>;
-                if (profile.position_title) return <Text style={styles.profileRole}>{profile.position_title}</Text>;
-                // Default to role if available
-                return profile.role ? (
-                  <Text style={styles.profileRole}>
-                    {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-                  </Text>
-                ) : null;
-              })()}
-            </View>
             <TouchableOpacity
-              style={styles.viewProfileButton}
+              style={styles.profileInfo}
               onPress={() => router.push('/profile')}
+              activeOpacity={0.7}
             >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.profileName}>{profile.name}</Text>
+                <Text style={styles.profileEmail} numberOfLines={1}>
+                  {profile.email}
+                </Text>
+                {(() => {
+                  // Priority: role badges > position_title > role
+                  if (profile.is_president) return <Text style={styles.profileRole}>President</Text>;
+                  if (profile.is_vp) return <Text style={styles.profileRole}>Vice President</Text>;
+                  if (profile.is_exec) return <Text style={styles.profileRole}>Executive</Text>;
+                  if (profile.is_hr) return <Text style={styles.profileRole}>Human Resources</Text>;
+                  if (profile.is_head) return <Text style={styles.profileRole}>Department Head</Text>;
+                  if (profile.role === 'admin') return <Text style={styles.profileRole}>Administrator</Text>;
+                  if (profile.role === 'driver') return <Text style={styles.profileRole}>Driver</Text>;
+                  if (profile.position_title) return <Text style={styles.profileRole}>{profile.position_title}</Text>;
+                  // Default to role if available
+                  return profile.role ? (
+                    <Text style={styles.profileRole}>
+                      {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
+                    </Text>
+                  ) : null;
+                })()}
+              </View>
               <Ionicons name="chevron-forward" size={24} color="#7a0019" />
             </TouchableOpacity>
           </View>
@@ -346,6 +347,9 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   profileName: {
     fontSize: 20,

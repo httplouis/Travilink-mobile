@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Platform,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -16,39 +17,21 @@ import { supabase } from '@/lib/supabase/client';
 import { Request } from '@/lib/types';
 import RequestStatusTracker from '@/components/RequestStatusTracker';
 import StatusBadge from '@/components/StatusBadge';
+import FileAttachmentList from '@/components/FileAttachmentList';
+import PDFDownloadButton from '@/components/PDFDownloadButton';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils';
 import { useRequestTracking } from '@/hooks/useRequestTracking';
-import { useRequestPDF } from '@/hooks/useRequestPDF';
-import { useDuplicateRequest } from '@/hooks/useDuplicateRequest';
-import { useAuth } from '@/contexts/AuthContext';
-import ApprovalActions from '@/components/ApprovalActions';
-import { isComptroller } from '@/lib/utils/navigation';
+import { Linking } from 'react-native';
 
 export default function RequestDetailsScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const insets = useSafeAreaInsets();
-  const { profile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'tracking'>(tab === 'tracking' ? 'tracking' : 'details');
-  const [showApprovalActions, setShowApprovalActions] = useState(false);
 
   // Use the tracking hook which fetches all related data
   const { data: trackingData, isLoading: isLoadingTracking, error: trackingError, refetch: refetchTracking } = useRequestTracking(id || '');
-  
-  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
-  // PDF download hook - use stable values to prevent hooks error
-  const { downloadPDF, downloading: downloadingPDF } = useRequestPDF({
-    requestId: id || '',
-    requestNumber: trackingData?.request?.request_number ?? null,
-    requesterName: trackingData?.request?.requester_name ?? null,
-    requestType: (trackingData?.request?.request_type as 'travel_order' | 'seminar' | null) ?? null,
-  });
-
-  // Duplicate request hook
-  const { duplicateRequest, duplicating } = useDuplicateRequest({
-    requestId: id || '',
-  });
   
   const request = trackingData?.request;
   const isLoading = isLoadingTracking;
@@ -90,26 +73,6 @@ export default function RequestDetailsScreen() {
 
   const hasParentHead = !!request?.parent_department_id;
   const requiresPresidentApproval = (request?.total_budget || 0) > 50000;
-
-  // Determine if user can approve this request
-  const canApprove = profile && (() => {
-    if (profile.is_head && request.status === 'pending_head' && !request.head_approved_at) {
-      return { canApprove: true, role: 'head' as const };
-    }
-    if (profile.is_vp && request.status === 'pending_vp' && !request.vp_approved_at) {
-      return { canApprove: true, role: 'vp' as const };
-    }
-    if (profile.is_president && request.status === 'pending_president' && !request.president_approved_at) {
-      return { canApprove: true, role: 'president' as const };
-    }
-    if (profile.is_hr && request.status === 'pending_hr' && !request.hr_approved_at) {
-      return { canApprove: true, role: 'hr' as const };
-    }
-    if (isComptroller(profile.email) && request.status === 'pending_comptroller' && !request.comptroller_approved_at) {
-      return { canApprove: true, role: 'comptroller' as const };
-    }
-    return { canApprove: false, role: null };
-  })();
   
   // Get approver names from tracking data
   const headApproverName = trackingData?.headApprover?.name || null;
@@ -150,7 +113,15 @@ export default function RequestDetailsScreen() {
         {/* Request Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.headerCardTop}>
-            <Text style={styles.requestNumber}>{request.request_number}</Text>
+            <View style={styles.requestNumberContainer}>
+              <Text style={styles.requestNumber}>{request.request_number}</Text>
+              {request.file_code && (
+                <View style={styles.fileCodeBadge}>
+                  <Ionicons name="document-text" size={14} color="#7a0019" />
+                  <Text style={styles.fileCodeText}>{request.file_code}</Text>
+                </View>
+              )}
+            </View>
             <StatusBadge status={request.status} size="md" />
           </View>
           <Text style={styles.requestTitle}>{request.title || request.purpose}</Text>
@@ -168,53 +139,16 @@ export default function RequestDetailsScreen() {
               <Text style={styles.headerCardDetailText}>{request.destination}</Text>
             </View>
           </View>
-          
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.pdfButton]}
-              onPress={downloadPDF}
-              disabled={downloadingPDF}
-            >
-              <Ionicons 
-                name={downloadingPDF ? "hourglass-outline" : "download-outline"} 
-                size={18} 
-                color="#fff" 
+          {/* PDF Download Button - Show when approved */}
+          {request.status === 'approved' && (
+            <View style={styles.pdfDownloadContainer}>
+              <PDFDownloadButton
+                requestId={request.id}
+                fileCode={request.file_code || undefined}
+                requestNumber={request.request_number}
               />
-              <Text style={styles.actionButtonText}>
-                {downloadingPDF ? 'Downloading...' : 'Download PDF'}
-              </Text>
-            </TouchableOpacity>
-            
-            {/* Duplicate Button - only show for user's own requests */}
-            {request.status === 'draft' || request.status === 'approved' || request.status === 'rejected' ? (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.duplicateButton]}
-                onPress={duplicateRequest}
-                disabled={duplicating}
-              >
-                <Ionicons 
-                  name={duplicating ? "hourglass-outline" : "copy-outline"} 
-                  size={18} 
-                  color="#7a0019" 
-                />
-                <Text style={[styles.actionButtonText, styles.duplicateButtonText]}>
-                  {duplicating ? 'Duplicating...' : 'Duplicate'}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {/* Approval Button - show if user can approve */}
-            {canApprove.canApprove && canApprove.role !== 'comptroller' && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.approveButton]}
-                onPress={() => setShowApprovalActions(true)}
-              >
-                <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                <Text style={styles.actionButtonText}>Review & Approve</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+            </View>
+          )}
         </View>
 
         {/* Tabs */}
@@ -300,11 +234,11 @@ export default function RequestDetailsScreen() {
                 </Text>
                 {request.expense_breakdown && request.expense_breakdown.length > 0 && (
                   <View style={styles.budgetBreakdown}>
-                    {request.expense_breakdown.map((expense, index) => (
+                    {request.expense_breakdown.map((expense: any, index: number) => (
                       <View key={index} style={styles.budgetItem}>
                         <View>
                           <Text style={styles.budgetItemCategory}>
-                            {expense.category}
+                            {expense.category || expense.item || 'Expense'}
                           </Text>
                           {expense.description && (
                             <Text style={styles.budgetItemDescription}>
@@ -339,6 +273,202 @@ export default function RequestDetailsScreen() {
                     {request.pickup_time && ` at ${request.pickup_time}`}
                   </Text>
                 )}
+              </View>
+            )}
+
+            {/* Contact Information */}
+            {(request.requester_contact_number || request.driver_contact_number) && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Contact Information</Text>
+                {request.requester_contact_number && (
+                  <View style={styles.contactItem}>
+                    <Ionicons name="call" size={20} color="#7a0019" />
+                    <View style={styles.contactText}>
+                      <Text style={styles.contactLabel}>Requester Contact</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const phone = request.requester_contact_number?.replace(/[\s-]/g, '') || '';
+                          Linking.openURL(`tel:${phone}`);
+                        }}
+                      >
+                        <Text style={styles.contactValue}>
+                          {request.requester_contact_number}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+                {request.driver_contact_number && (
+                  <View style={styles.contactItem}>
+                    <Ionicons name="call" size={20} color="#7a0019" />
+                    <View style={styles.contactText}>
+                      <Text style={styles.contactLabel}>Driver Contact</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const phone = request.driver_contact_number?.replace(/[\s-]/g, '') || '';
+                          Linking.openURL(`tel:${phone}`);
+                        }}
+                      >
+                        <Text style={styles.contactValue}>
+                          {request.driver_contact_number}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+                {request.sms_notification_sent && request.sms_sent_at && (
+                  <View style={styles.smsStatus}>
+                    <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+                    <Text style={styles.smsStatusText}>
+                      SMS notification sent on {formatDateTime(request.sms_sent_at)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Pickup Preference */}
+            {request.pickup_preference && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Pickup Preference</Text>
+                <Text style={styles.sectionText}>
+                  {request.pickup_preference === 'pickup'
+                    ? 'Pickup at Location'
+                    : request.pickup_preference === 'self'
+                    ? 'Self-Transport'
+                    : 'Gymnasium Pickup'}
+                </Text>
+              </View>
+            )}
+
+            {/* Signatures */}
+            {(request.requester_signature || request.head_signature || request.parent_head_signature || 
+              request.hr_signature || request.vp_signature || request.president_signature || 
+              request.exec_signature || request.comptroller_signature) && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Signatures</Text>
+                {request.requester_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>Requester Signature</Text>
+                    <Image 
+                      source={{ uri: request.requester_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                    {request.requester_signed_at && (
+                      <Text style={styles.signatureDate}>
+                        Signed on {formatDateTime(request.requester_signed_at)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {request.head_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>Department Head Signature</Text>
+                    <Image 
+                      source={{ uri: request.head_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                    {request.head_signed_at && (
+                      <Text style={styles.signatureDate}>
+                        Signed on {formatDateTime(request.head_signed_at)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {request.parent_head_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>Parent Head Signature</Text>
+                    <Image 
+                      source={{ uri: request.parent_head_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                  </View>
+                )}
+                {request.hr_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>HR Signature</Text>
+                    <Image 
+                      source={{ uri: request.hr_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                    {request.hr_signed_at && (
+                      <Text style={styles.signatureDate}>
+                        Signed on {formatDateTime(request.hr_signed_at)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {request.vp_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>VP Signature</Text>
+                    <Image 
+                      source={{ uri: request.vp_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                    {request.vp_signed_at && (
+                      <Text style={styles.signatureDate}>
+                        Signed on {formatDateTime(request.vp_signed_at)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {request.president_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>President Signature</Text>
+                    <Image 
+                      source={{ uri: request.president_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                    {request.president_signed_at && (
+                      <Text style={styles.signatureDate}>
+                        Signed on {formatDateTime(request.president_signed_at)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {request.exec_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>Executive Signature</Text>
+                    <Image 
+                      source={{ uri: request.exec_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                    {request.exec_signed_at && (
+                      <Text style={styles.signatureDate}>
+                        Signed on {formatDateTime(request.exec_signed_at)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {request.comptroller_signature && (
+                  <View style={styles.signatureItem}>
+                    <Text style={styles.signatureLabel}>Comptroller Signature</Text>
+                    <Image 
+                      source={{ uri: request.comptroller_signature }} 
+                      style={styles.signatureImage} 
+                      resizeMode="contain"
+                    />
+                    {request.comptroller_signed_at && (
+                      <Text style={styles.signatureDate}>
+                        Signed on {formatDateTime(request.comptroller_signed_at)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* File Attachments */}
+            {request.attachments && request.attachments.length > 0 && (
+              <View style={styles.section}>
+                <FileAttachmentList attachments={request.attachments} />
               </View>
             )}
 
@@ -558,10 +688,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  requestNumberContainer: {
+    flex: 1,
+    gap: 8,
+  },
   requestNumber: {
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
+  },
+  fileCodeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  fileCodeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7a0019',
+  },
+  pdfDownloadContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
   },
   requestTitle: {
     fontSize: 16,
@@ -580,40 +738,6 @@ const styles = StyleSheet.create({
   headerCardDetailText: {
     fontSize: 14,
     color: '#6b7280',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  pdfButton: {
-    backgroundColor: '#7a0019',
-  },
-  duplicateButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#7a0019',
-  },
-  approveButton: {
-    backgroundColor: '#16a34a',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  duplicateButtonText: {
-    color: '#7a0019',
   },
   tabs: {
     flexDirection: 'row',
@@ -757,6 +881,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
     lineHeight: 20,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  contactText: {
+    flex: 1,
+  },
+  contactLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  contactValue: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#7a0019',
+    textDecorationLine: 'underline',
+  },
+  smsStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f0fdf4',
+  },
+  smsStatusText: {
+    fontSize: 12,
+    color: '#16a34a',
+    fontWeight: '500',
+  },
+  signatureItem: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  signatureLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  signatureImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 8,
+  },
+  signatureDate: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
 });
 

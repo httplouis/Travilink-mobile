@@ -18,14 +18,13 @@ import { router } from 'expo-router';
 import { Vehicle } from '@/hooks/useVehicles';
 import NavigationHeader from '@/components/NavigationHeader';
 import SidebarMenu from '@/components/SidebarMenu';
+import CustomTabBar from '@/components/CustomTabBar';
 
 export default function VehiclesScreen() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>('available');
   const [typeFilter, setTypeFilter] = useState<string | undefined>();
-  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // All hooks must be called before any early returns
+  const [refreshing, setRefreshing] = useState(false);
   const { data: vehicles = [], isLoading, error, refetch } = useVehicles({
     status: statusFilter,
     type: typeFilter,
@@ -185,6 +184,7 @@ export default function VehiclesScreen() {
           </View>
         }
       />
+      <CustomTabBar />
     </View>
   );
 }

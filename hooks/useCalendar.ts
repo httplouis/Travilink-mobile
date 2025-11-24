@@ -14,6 +14,7 @@ export function useCalendar(userId: string, startDate: Date, endDate: Date) {
 
       // Fetch all approved/pending requests within date range (not just user's requests)
       // This matches web version behavior - showing all bookings on the calendar
+      // Include more statuses to show all relevant requests
       const { data, error } = await supabase
         .from('requests')
         .select(`
@@ -29,10 +30,20 @@ export function useCalendar(userId: string, startDate: Date, endDate: Date) {
           assigned_driver_id,
           requester_id
         `)
-        .in('status', ['approved', 'pending_admin', 'pending_exec', 'pending_hr', 'pending_head'] as RequestStatus[])
+        .in('status', [
+          'approved', 
+          'pending_admin', 
+          'pending_exec', 
+          'pending_hr', 
+          'pending_head',
+          'pending_vp',
+          'pending_president',
+          'pending_comptroller'
+        ] as RequestStatus[])
         .gte('travel_start_date', startDate.toISOString().split('T')[0])
         .lte('travel_end_date', endDate.toISOString().split('T')[0])
-        .order('travel_start_date', { ascending: true });
+        .order('travel_start_date', { ascending: true })
+        .limit(1000); // Increase limit to get all requests
 
       if (error) throw error;
 

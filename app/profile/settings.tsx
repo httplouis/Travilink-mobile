@@ -14,7 +14,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Platform } from 'react-native';
 import NavigationHeader from '@/components/NavigationHeader';
 import CustomTabBar from '@/components/CustomTabBar';
-import SignatureSettings from '@/components/SignatureSettings';
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuth();
@@ -45,7 +44,7 @@ export default function SettingsScreen() {
         
         <TouchableOpacity 
           style={styles.settingItem}
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push('/profile/edit')}
         >
           <View style={styles.settingLeft}>
             <Ionicons name="person-outline" size={20} color="#6b7280" />
@@ -57,8 +56,11 @@ export default function SettingsScreen() {
         <TouchableOpacity 
           style={styles.settingItem}
           onPress={() => {
-            // TODO: Implement change password screen
-            Alert.alert('Coming Soon', 'Password change feature will be available soon.');
+            Alert.alert(
+              'Change Password',
+              'Password changes are managed through Azure MS Teams. Please contact your administrator or use the Teams portal to change your password.',
+              [{ text: 'OK' }]
+            );
           }}
         >
           <View style={styles.settingLeft}>
@@ -67,14 +69,6 @@ export default function SettingsScreen() {
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
-      </View>
-
-      {/* Digital Signature Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Digital Signature</Text>
-        <View style={styles.signatureSection}>
-          <SignatureSettings />
-        </View>
       </View>
 
       {/* Notifications Section */}
@@ -126,7 +120,11 @@ export default function SettingsScreen() {
         <TouchableOpacity 
           style={styles.settingItem}
           onPress={() => {
-            Alert.alert('Terms & Privacy', 'Terms and Privacy policy will be available soon.');
+            Alert.alert(
+              'Terms & Privacy',
+              'TraviLink Mobile respects your privacy. By using this app, you agree to our terms of service and privacy policy. For detailed information, please contact the IT department.',
+              [{ text: 'OK' }]
+            );
           }}
         >
           <View style={styles.settingLeft}>
@@ -140,8 +138,9 @@ export default function SettingsScreen() {
           style={styles.settingItem}
           onPress={() => {
             Alert.alert(
-              'About TraveLink',
-              'TraveLink Mobile v1.0.0\n\nSmart Campus Transport System\n\n© 2025 MSEUF'
+              'About TraviLink Mobile',
+              'TraviLink Mobile v1.0.0\n\nA transportation management system for MSEUF.\n\nDeveloped for efficient travel order and seminar application management.',
+              [{ text: 'OK' }]
             );
           }}
         >
@@ -154,20 +153,9 @@ export default function SettingsScreen() {
       </View>
 
 
-      {/* Sign Out Section */}
-      <View style={styles.section}>
-        <TouchableOpacity 
-          style={styles.signOutButton}
-          onPress={handleSignOut}
-        >
-          <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Version */}
       <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>TraveLink Mobile v1.0.0</Text>
+        <Text style={styles.versionText}>TraviLink Mobile v1.0.0</Text>
       </View>
       
       {/* Bottom padding to account for navbar */}
@@ -246,10 +234,6 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: '#9ca3af',
-  },
-  signatureSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
   },
 });
 

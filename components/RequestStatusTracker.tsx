@@ -207,7 +207,7 @@ export default function RequestStatusTracker({
           <View style={styles.rejectedText}>
             <Text style={styles.rejectedTitle}>Request Rejected</Text>
             <Text style={styles.rejectedSubtitle}>
-              Rejected at {rejectionStage} stage
+              Rejected at {rejectionStage || 'unknown'} stage
               {rejectedBy && ` by ${rejectedBy}`}
             </Text>
           </View>

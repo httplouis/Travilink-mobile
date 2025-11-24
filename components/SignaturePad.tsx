@@ -21,6 +21,8 @@ interface SignaturePadProps {
   onSave?: (dataUrl: string) => void;
   onClear?: () => void;
   onDraw?: () => void;
+  onDrawingStart?: () => void; // Callback when user starts drawing
+  onDrawingEnd?: () => void; // Callback when user stops drawing
   hideSaveButton?: boolean;
   disabled?: boolean;
 }
@@ -33,28 +35,31 @@ export default function SignaturePad({
   onSave,
   onClear,
   onDraw,
+  onDrawingStart,
+  onDrawingEnd,
   hideSaveButton = false,
   disabled = false,
 }: SignaturePadProps) {
   const signatureRef = useRef<any>(null);
   const [hasSignature, setHasSignature] = useState(false);
   const [drewOnce, setDrewOnce] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
     if (value) {
       setHasSignature(true);
-      setDrewOnce(true);
+      // Don't set drewOnce to true if value is provided, so user can still draw
+      // Only set drewOnce if user actually draws
     } else {
       setHasSignature(false);
+      setDrewOnce(false);
     }
   }, [value]);
 
   const handleOK = (signature: string) => {
-    if (signature && signature.length > 0) {
-      setHasSignature(true);
-      setDrewOnce(true);
-      onSave?.(signature);
-    }
+    setHasSignature(true);
+    setDrewOnce(true);
+    onSave?.(signature);
   };
 
   const handleClear = () => {
@@ -65,19 +70,21 @@ export default function SignaturePad({
   };
 
   const handleBegin = () => {
-    setDrewOnce(true);
-    onDraw?.();
+    setIsDrawing(true);
+    onDrawingStart?.();
+    if (!drewOnce) {
+      setDrewOnce(true);
+      onDraw?.();
+    }
   };
 
   const handleEnd = () => {
-    // Don't auto-read signature on end - this causes re-renders and resets canvas
-    // Only read signature when explicitly requested (manual save button or onOK callback)
-    // This allows user to continue drawing multiple strokes without interruption
-  };
-  
-  const handleEmpty = () => {
-    // Called when signature is cleared or empty
-    setHasSignature(false);
+    setIsDrawing(false);
+    onDrawingEnd?.();
+    // Auto-save on end
+    if (drewOnce) {
+      signatureRef.current?.readSignature();
+    }
   };
 
   const style = `
@@ -85,50 +92,77 @@ export default function SignaturePad({
       background-color: white;
       border: none;
       box-shadow: none;
+      width: 100%;
+      height: 100%;
     }
     .m-signature-pad--body {
       border: none;
+      width: 100%;
+      height: 100%;
     }
     .m-signature-pad--body canvas {
       border: none;
+      background-color: white;
+      touch-action: none;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .m-signature-pad--body button {
+      color: ${color};
     }
   `;
 
   return (
     <View style={styles.container}>
-      <View style={[styles.canvasContainer, { height }, disabled && styles.disabled]}>
+      <View 
+        style={[styles.canvasContainer, { height }, disabled && styles.disabled]}
+        onStartShouldSetResponder={() => {
+          setIsDrawing(true);
+          onDrawingStart?.();
+          return true;
+        }}
+        onMoveShouldSetResponder={() => true}
+        onResponderRelease={() => {
+          setIsDrawing(false);
+          onDrawingEnd?.();
+        }}
+      >
         {value && !drewOnce ? (
           <Image source={{ uri: value }} style={styles.signatureImage} resizeMode="contain" />
         ) : (
-          <SignatureCanvas
-            ref={signatureRef}
-            onOK={handleOK}
-            onBegin={handleBegin}
-            onEnd={handleEnd}
-            onEmpty={handleEmpty}
-            descriptionText="Sign here"
-            clearText="Clear"
-            confirmText="Save"
-            webStyle={style}
-            bgWidth={400}
-            bgHeight={height}
-            minWidth={lineWidth}
-            maxWidth={lineWidth}
-            penColor={color}
-            backgroundColor="white"
-            imageType="image/png"
-            autoClear={false}
-            dataURL={value || undefined}
-            rotated={false}
-            onClear={handleClear}
-            shouldCancelWhenOutside={false}
-            onGetData={(data) => {
-              // Additional callback to ensure signature is captured
-              if (data && data.length > 0) {
-                setHasSignature(true);
-              }
+          <View 
+            style={{ width: '100%', height: '100%', backgroundColor: '#fff' }}
+            onStartShouldSetResponder={() => {
+              setIsDrawing(true);
+              onDrawingStart?.();
+              return true;
             }}
-          />
+            onMoveShouldSetResponder={() => true}
+            onResponderRelease={() => {
+              setIsDrawing(false);
+              onDrawingEnd?.();
+            }}
+          >
+            <SignatureCanvas
+              ref={signatureRef}
+              onOK={handleOK}
+              onBegin={handleBegin}
+              onEnd={handleEnd}
+              descriptionText=""
+              clearText=""
+              confirmText=""
+              webStyle={style}
+              bgWidth={400}
+              bgHeight={height}
+              minWidth={lineWidth}
+              maxWidth={lineWidth}
+              penColor={color}
+              backgroundColor="white"
+              imageType="image/png"
+              autoClear={false}
+              rotated={false}
+            />
+          </View>
         )}
       </View>
 
@@ -227,6 +261,8 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     backgroundColor: '#fff',
     overflow: 'hidden',
+    width: '100%',
+    minHeight: 160,
   },
   canvas: {
     flex: 1,

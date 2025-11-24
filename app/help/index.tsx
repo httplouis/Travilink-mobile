@@ -167,7 +167,9 @@ Request statuses:
                     if (item.action) {
                       item.action();
                     } else if (item.detailedContent) {
-                      setExpandedFAQ(sectionIndex * 100 + itemIndex);
+                      // Toggle: if already expanded, collapse it; otherwise expand
+                      const currentKey = sectionIndex * 100 + itemIndex;
+                      setExpandedFAQ(expandedFAQ === currentKey ? null : currentKey);
                     }
                   }}
                   activeOpacity={0.7}

@@ -21,6 +21,7 @@ import { formatTimeAgo } from '@/lib/utils';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import NavigationHeader from '@/components/NavigationHeader';
+import CustomTabBar from '@/components/CustomTabBar';
 import SidebarMenu from '@/components/SidebarMenu';
 
 type NotificationsTab = 'unread' | 'all';
@@ -130,24 +131,10 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       <NavigationHeader
         title="Notifications"
+        onMenuPress={() => setSidebarVisible(true)}
         showNotification={false}
-        showMenu={false}
-        showBack={true}
+        showMenu={true}
       />
-
-      {/* Mark All as Read Button - Top */}
-      {unreadNotifications.length > 0 && (
-        <View style={styles.markAllTopContainer}>
-          <TouchableOpacity
-            style={styles.markAllTopButton}
-            onPress={handleMarkAllRead}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="checkmark-done" size={18} color="#7a0019" />
-            <Text style={styles.markAllTopButtonText}>Mark all as read</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -232,8 +219,35 @@ export default function NotificationsScreen() {
               tintColor="#7a0019"
             />
           }
+          ListFooterComponent={
+            tab === 'unread' && unreadNotifications.length > 0 ? (
+              <View style={styles.markAllFooterContainer}>
+                <TouchableOpacity
+                  style={styles.markAllFooterButton}
+                  onPress={handleMarkAllRead}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="checkmark-done" size={20} color="#7a0019" />
+                  <Text style={styles.markAllFooterButtonText}>Mark all as read</Text>
+                </TouchableOpacity>
+              </View>
+            ) : tab === 'all' && unreadNotifications.length > 0 ? (
+              <View style={styles.markAllFooterContainer}>
+                <TouchableOpacity
+                  style={styles.markAllFooterButton}
+                  onPress={handleMarkAllRead}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="checkmark-done" size={20} color="#7a0019" />
+                  <Text style={styles.markAllFooterButtonText}>Mark all as read</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null
+          }
         />
       )}
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
+      <CustomTabBar />
     </View>
   );
 }
@@ -243,28 +257,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  markAllTopContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  markAllFooterContainer: {
+    padding: 16,
+    paddingTop: 8,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
-  markAllTopButton: {
+  markAllFooterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#fef2f2',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#fecaca',
   },
-  markAllTopButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+  markAllFooterButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#7a0019',
   },
   tabs: {
