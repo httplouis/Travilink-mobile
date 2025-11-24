@@ -284,29 +284,86 @@ export default function TravelOrderScreen() {
   };
 
   const fetchDepartmentHead = async (departmentId: string) => {
-    try {
-      const { data: heads, error } = await supabase
-        .from('users')
-        .select('name')
-        .eq('role', 'head')
-        .eq('department_id', departmentId)
-        .eq('status', 'active')
-        .limit(1);
-
-      if (error) throw error;
-
-      if (heads && heads.length > 0) {
-        const headName = heads[0].name || '';
-        setRequestingPersonHeadName(headName);
-        if (!formData.endorsedByHeadName) {
-          setFormData(prev => ({ ...prev, endorsedByHeadName: headName }));
-        }
-      } else {
-        setRequestingPersonHeadName('');
-      }
-    } catch (error) {
-      console.error('Error fetching department head:', error);
+    if (!departmentId) {
       setRequestingPersonHeadName('');
+      return;
+    }
+
+    // Retry logic for network issues
+    const maxRetries = 2;
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const { data: heads, error } = await supabase
+          .from('users')
+          .select('name')
+          .eq('role', 'head')
+          .eq('department_id', departmentId)
+          .eq('status', 'active')
+          .limit(1);
+
+        if (error) {
+          // Check if it's an abort error - don't retry, just fail silently
+          if (error.message?.includes('Aborted') || error.message?.includes('abort') || error.name === 'AbortError') {
+            // Abort errors are usually from timeouts or component unmounts - don't log as error
+            if (__DEV__) {
+              console.log('[fetchDepartmentHead] Request aborted (likely timeout or component unmount)');
+            }
+            return;
+          }
+          throw error;
+        }
+
+        if (heads && heads.length > 0) {
+          const headName = heads[0].name || '';
+          setRequestingPersonHeadName(headName);
+          if (!formData.endorsedByHeadName) {
+            setFormData(prev => ({ ...prev, endorsedByHeadName: headName }));
+          }
+        } else {
+          setRequestingPersonHeadName('');
+        }
+        return; // Success, exit retry loop
+      } catch (error: any) {
+        lastError = error;
+        
+        // Don't retry on abort errors
+        if (error.message?.includes('Aborted') || error.message?.includes('abort') || error.name === 'AbortError') {
+          if (__DEV__) {
+            console.log('[fetchDepartmentHead] Request aborted');
+          }
+          return;
+        }
+
+        // Retry on network errors with exponential backoff
+        if (attempt < maxRetries && (
+          error.message?.includes('network') || 
+          error.message?.includes('fetch') ||
+          error.message?.includes('timeout')
+        )) {
+          const delay = 500 * attempt; // 500ms, 1000ms
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Log only meaningful errors (not aborts)
+        if (__DEV__ && error.message && !error.message.includes('Aborted')) {
+          console.warn(`[fetchDepartmentHead] Error fetching department head (attempt ${attempt}/${maxRetries}):`, {
+            message: error.message,
+            code: error.code,
+          });
+        }
+      }
+    }
+
+    // If all retries failed, set empty and log final error
+    setRequestingPersonHeadName('');
+    if (lastError && __DEV__ && lastError.message && !lastError.message.includes('Aborted')) {
+      console.warn('[fetchDepartmentHead] Failed after retries:', {
+        message: lastError.message,
+        code: lastError.code,
+      });
     }
   };
 
