@@ -56,6 +56,9 @@ export default function BudgetReviewModal({
   const [isDrawing, setIsDrawing] = useState(false);
   const [autoSignEnabled, setAutoSignEnabled] = useState(false);
   const [autoSignature, setAutoSignature] = useState<string | null>(null);
+  const [showApproverSelection, setShowApproverSelection] = useState(false);
+  const [suggestedHrId, setSuggestedHrId] = useState<string | null>(null);
+  const [hrApprovers, setHrApprovers] = useState<any[]>([]);
   const { updateBudget, approveBudget, returnToSender, isSubmitting } = useComptrollerBudgetReview();
   const { profile } = useAuth();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -104,12 +107,26 @@ export default function BudgetReviewModal({
     })
   ).current;
 
-  // Reset when modal opens
+  // Reset when modal opens/closes
   useEffect(() => {
     if (visible) {
       translateY.setValue(0);
       // Load auto-signature settings
       loadAutoSignature();
+      // Reset editing state when modal opens
+      setEditingBudget(false);
+      setEditedBudget({});
+      setOriginalBudget({});
+      setComments('');
+      setShowApproverSelection(false);
+    } else {
+      // Clean up when modal closes
+      setEditingBudget(false);
+      setEditedBudget({});
+      setOriginalBudget({});
+      setComments('');
+      setSignature('');
+      setShowApproverSelection(false);
     }
   }, [visible, profile?.id]);
 
@@ -209,11 +226,11 @@ export default function BudgetReviewModal({
     expenseBreakdown.forEach((item: any) => {
       const itemKey = item.item?.toLowerCase() || '';
       const originalAmount = item.amount || 0;
-      const editedAmount = editedBudget[itemKey] ?? originalAmount;
+      const editedAmount = editedBudget[itemKey] !== undefined ? (editedBudget[itemKey] ?? 0) : originalAmount;
       newTotal = newTotal - originalAmount + editedAmount;
     });
     
-    return newTotal;
+    return Math.max(0, newTotal); // Ensure total never goes negative
   }, [editedBudget, expenseBreakdown, request.total_budget]);
 
   const handleSaveBudgetChanges = async () => {
@@ -453,11 +470,16 @@ export default function BudgetReviewModal({
                     {expenseBreakdown.map((item: any, index: number) => {
                       const itemKey = item.item?.toLowerCase() || `item-${index}`;
                       const originalAmount = item.amount || 0;
-                      const editedAmount = editedBudget[itemKey] !== undefined ? editedBudget[itemKey] : originalAmount;
-                      const isEdited = editedBudget[itemKey] !== undefined && (editedAmount ?? 0) !== originalAmount;
+                      // Get edited amount - use null if explicitly set to null, otherwise use original
+                      const hasEdit = editedBudget[itemKey] !== undefined;
+                      const editedAmount = hasEdit ? (editedBudget[itemKey] ?? 0) : originalAmount;
+                      const isEdited = hasEdit && editedAmount !== originalAmount;
                       const displayLabel = item.item === 'Other' && item.description 
                         ? item.description 
                         : (item.item || 'Other');
+                      
+                      // For display: show 0 as 0, null as 0, undefined as original
+                      const displayAmount = hasEdit ? (editedBudget[itemKey] ?? 0) : originalAmount;
 
                       return (
                         <View key={index} style={styles.budgetItem}>
@@ -473,7 +495,7 @@ export default function BudgetReviewModal({
                                 <CurrencyInput
                                   label=""
                                   placeholder="0.00"
-                                  value={editedBudget[itemKey] !== undefined ? (editedBudget[itemKey] !== null ? String(editedBudget[itemKey]) : '') : String(originalAmount)}
+                                  value={hasEdit ? (editedBudget[itemKey] !== null ? String(editedBudget[itemKey] ?? 0) : '') : String(originalAmount)}
                                   onChange={(value) => updateBudgetItem(itemKey, value)}
                                 />
                               </View>
@@ -485,7 +507,7 @@ export default function BudgetReviewModal({
                                   </Text>
                                 )}
                                 <Text style={[styles.budgetAmount, isEdited && styles.budgetAmountEdited]}>
-                                  ₱{editedAmount.toLocaleString()}
+                                  ₱{displayAmount.toLocaleString()}
                                 </Text>
                               </View>
                             )}
