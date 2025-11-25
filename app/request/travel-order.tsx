@@ -804,45 +804,61 @@ export default function TravelOrderScreen() {
         attachments: uploadedAttachments.length > 0 ? uploadedAttachments : null,
       };
 
-      // Insert request with minimal retry logic (only for duplicate keys, max 2 retries)
-      const maxRetries = 2; // Reduced from 5 to prevent request storms
+      // Insert request with retry logic for duplicate key errors (race conditions)
+      const maxRetries = 3; // Increased to 3 to handle race conditions better
       let request: any = null;
       let insertError: any = null;
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const { data, error } = await supabase
-          .from('requests')
-          .insert(requestData)
-          .select()
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('requests')
+            .insert(requestData)
+            .select()
+            .single();
 
-        if (!error) {
-          request = data;
-          insertError = null;
-          break;
-        }
+          if (!error) {
+            request = data;
+            insertError = null;
+            break;
+          }
 
-        // Only retry for duplicate key errors (race condition), not for network/abort errors
-        const isAbortError = error.message?.includes('Aborted') || error.message?.includes('abort') || error.name === 'AbortError';
-        const isTimeoutError = error.message?.includes('timeout') || error.message?.includes('Timeout');
-        
-        // Don't retry on abort/timeout - these indicate network issues, not server issues
-        if (isAbortError || isTimeoutError) {
+          // Only retry for duplicate key errors (race condition), not for network/abort errors
+          const isAbortError = error.message?.includes('Aborted') || error.message?.includes('abort') || error.name === 'AbortError';
+          const isTimeoutError = error.message?.includes('timeout') || error.message?.includes('Timeout');
+          
+          // Don't retry on abort/timeout - these indicate network issues, not server issues
+          if (isAbortError || isTimeoutError) {
+            insertError = error;
+            break;
+          }
+
+          // Check if it's a duplicate key error on request_number
+          const isDuplicateKey = error.code === '23505' && (
+            error.message?.includes('request_number') || 
+            error.details?.includes('request_number') ||
+            error.hint?.includes('request_number')
+          );
+
+          // If it's a duplicate key error and we have retries left, wait and retry
+          if (isDuplicateKey && attempt < maxRetries) {
+            console.warn(`🔄 Duplicate request number detected on attempt ${attempt}, retrying...`);
+            // Exponential backoff: 300ms, 600ms, 1200ms
+            const backoffDelay = 300 * Math.pow(2, attempt - 1);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+            // Clear request_number to force database to regenerate (with new sequence number)
+            requestData.request_number = null;
+            continue;
+          }
+
+          // For other errors or final attempt, break and throw
           insertError = error;
           break;
+        } catch (err: any) {
+          // Catch any unexpected errors during insert
+          insertError = err;
+          break;
         }
-
-        // If it's a duplicate key error and we have retries left, wait and retry
-        if (error.code === '23505' && attempt < maxRetries) {
-          console.warn(`🔄 Duplicate request number on attempt ${attempt}, retrying...`);
-          // Wait with shorter backoff: 200ms, 400ms (reduced from exponential to prevent storms)
-          await new Promise(resolve => setTimeout(resolve, 200 * attempt));
-          continue;
-        }
-
-        // For other errors or final attempt, break and throw
-        insertError = error;
-        break;
       }
 
       if (insertError || !request) {
