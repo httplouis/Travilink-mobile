@@ -805,7 +805,9 @@ export default function TravelOrderScreen() {
       };
 
       // Insert request with retry logic for duplicate key errors (race conditions)
-      const maxRetries = 3; // Increased to 3 to handle race conditions better
+      // Note: Database uses sequences for thread-safe number generation, but collisions can still
+      // occur if multiple requests with same requester/driver are submitted simultaneously
+      const maxRetries = 3; // 3 retries should handle most race conditions
       let request: any = null;
       let insertError: any = null;
 
@@ -843,10 +845,12 @@ export default function TravelOrderScreen() {
           // If it's a duplicate key error and we have retries left, wait and retry
           if (isDuplicateKey && attempt < maxRetries) {
             console.warn(`🔄 Duplicate request number detected on attempt ${attempt}, retrying...`);
-            // Exponential backoff: 300ms, 600ms, 1200ms
-            const backoffDelay = 300 * Math.pow(2, attempt - 1);
+            // Exponential backoff with jitter: 300-400ms, 600-800ms, 1200-1500ms
+            const baseDelay = 300 * Math.pow(2, attempt - 1);
+            const jitter = Math.random() * 100; // Add 0-100ms random jitter to prevent thundering herd
+            const backoffDelay = baseDelay + jitter;
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
-            // Clear request_number to force database to regenerate (with new sequence number)
+            // Ensure request_number is null to force database to regenerate (with next sequence number)
             requestData.request_number = null;
             continue;
           }
