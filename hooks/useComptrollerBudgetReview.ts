@@ -105,7 +105,7 @@ export function useComptrollerBudgetReview() {
     }
   };
 
-  const approveBudget = async ({ requestId, signature, comments, editedBudget }: ApproveBudgetParams) => {
+  const approveBudget = async ({ requestId, signature, comments, editedBudget, nextApproverId, nextApproverRole }: ApproveBudgetParams) => {
     setIsSubmitting(true);
     setError(null);
 
