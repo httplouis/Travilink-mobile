@@ -162,6 +162,13 @@ export function useComptrollerBudgetReview() {
         }
       }
 
+      // Get current request to preserve workflow_metadata
+      const { data: currentRequest } = await supabase
+        .from('requests')
+        .select('workflow_metadata')
+        .eq('id', requestId)
+        .single();
+
       // Approve budget and move to next stage
       const updateData: any = {
         comptroller_approved_at: now,
@@ -172,12 +179,13 @@ export function useComptrollerBudgetReview() {
         status: 'pending_hr', // Move to HR stage by default
       };
 
-      // Add next approver info if provided
-      if (nextApproverId) {
-        updateData.next_approver_id = nextApproverId;
-      }
-      if (nextApproverRole) {
-        updateData.next_approver_role = nextApproverRole;
+      // Store next approver info in workflow_metadata if provided
+      if (nextApproverId || nextApproverRole) {
+        updateData.workflow_metadata = {
+          ...(currentRequest?.workflow_metadata || {}),
+          next_approver_id: nextApproverId,
+          next_approver_role: nextApproverRole,
+        };
       }
 
       const { error: updateError } = await supabase

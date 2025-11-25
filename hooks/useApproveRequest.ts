@@ -30,6 +30,8 @@ export function useApproveRequest() {
     signature,
     comments,
     rejectionReason,
+    nextApproverId,
+    nextApproverRole,
   }: ApproveRequestParams) => {
     setIsSubmitting(true);
     setError(null);
@@ -56,6 +58,17 @@ export function useApproveRequest() {
       const now = new Date().toISOString();
 
       if (action === 'approve') {
+        // Get current request first to preserve workflow_metadata and determine next status
+        const { data: currentRequest } = await supabase
+          .from('requests')
+          .select('status, total_budget, requester_is_head, department_id, parent_department_id, workflow_metadata')
+          .eq('id', requestId)
+          .single();
+
+        if (!currentRequest) {
+          throw new Error('Request not found');
+        }
+
         // Update approval fields based on role
         const updateData: any = {};
 
@@ -64,8 +77,14 @@ export function useApproveRequest() {
           updateData.head_approved_by = userId;
           updateData.head_signature = signature;
           if (comments) updateData.head_comments = comments;
-          if (nextApproverId) updateData.next_approver_id = nextApproverId;
-          if (nextApproverRole) updateData.next_approver_role = nextApproverRole;
+          // Store next approver info in workflow_metadata if provided
+          if (nextApproverId || nextApproverRole) {
+            updateData.workflow_metadata = {
+              ...(currentRequest.workflow_metadata || {}),
+              next_approver_id: nextApproverId,
+              next_approver_role: nextApproverRole,
+            };
+          }
         } else if (role === 'comptroller') {
           updateData.comptroller_approved_at = now;
           updateData.comptroller_approved_by = userId;
@@ -85,18 +104,7 @@ export function useApproveRequest() {
           updateData.hr_approved_at = now;
           updateData.hr_approved_by = userId;
           updateData.hr_signature = signature;
-          if (comments) updateData.hr_comments = comments;
-        }
-
-        // Get current request to determine next status
-        const { data: currentRequest } = await supabase
-          .from('requests')
-          .select('status, total_budget, requester_is_head, department_id, parent_department_id')
-          .eq('id', requestId)
-          .single();
-
-        if (!currentRequest) {
-          throw new Error('Request not found');
+          if (comments)           updateData.hr_comments = comments;
         }
 
         // Determine next status based on current status and role
