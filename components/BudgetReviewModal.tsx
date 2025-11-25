@@ -108,8 +108,13 @@ export default function BudgetReviewModal({
     })
   ).current;
 
-  // Track saved edits to show strikethrough even after saving
-  const [savedEdits, setSavedEdits] = useState<Record<string, number>>({});
+  // Store original expense breakdown when modal opens (before any edits)
+  useEffect(() => {
+    if (visible && request.expense_breakdown && Array.isArray(request.expense_breakdown)) {
+      // Deep clone to preserve original values
+      originalExpenseBreakdown.current = JSON.parse(JSON.stringify(request.expense_breakdown));
+    }
+  }, [visible, request.id]); // Only update when modal opens or request changes
 
   // Reset when modal opens/closes
   useEffect(() => {
@@ -117,23 +122,12 @@ export default function BudgetReviewModal({
       translateY.setValue(0);
       // Load auto-signature settings
       loadAutoSignature();
-      // Reset editing state when modal opens (but keep savedEdits to show strikethrough)
+      // Reset editing state when modal opens
       setEditingBudget(false);
       setEditedBudget({});
       setOriginalBudget({});
       setComments('');
       setShowApproverSelection(false);
-      // Load saved edits from request if available (comptroller_edited_budget indicates edits were saved)
-      if (request.comptroller_edited_budget && request.expense_breakdown) {
-        const saved: Record<string, number> = {};
-        request.expense_breakdown.forEach((item: any) => {
-          const itemKey = item.item?.toLowerCase() || '';
-          saved[itemKey] = item.amount || 0;
-        });
-        setSavedEdits(saved);
-      } else {
-        setSavedEdits({});
-      }
     } else {
       // Clean up when modal closes
       setEditingBudget(false);
@@ -142,9 +136,8 @@ export default function BudgetReviewModal({
       setComments('');
       setSignature('');
       setShowApproverSelection(false);
-      setSavedEdits({});
     }
-  }, [visible, profile?.id, request.id]);
+  }, [visible, profile?.id]);
 
   // Load auto-signature from user settings
   const loadAutoSignature = async () => {
@@ -263,11 +256,9 @@ export default function BudgetReviewModal({
 
     if (result.success) {
       Alert.alert('Success', 'Budget changes saved successfully.');
-      // Save the edits to show strikethrough after saving
-      setSavedEdits({ ...editedBudget });
       setEditingBudget(false);
-      // Keep editedBudget so strikethrough shows
-      // Don't clear editedBudget - we want to show the strikethrough
+      // Keep editedBudget so the UI shows the changes until the request refreshes
+      // The strikethrough will show based on comparison with originalExpenseBreakdown
     }
   };
 
@@ -526,7 +517,7 @@ export default function BudgetReviewModal({
                                 <CurrencyInput
                                   label=""
                                   placeholder="0.00"
-                                  value={hasEdit ? (editedBudget[itemKey] !== null ? String(editedBudget[itemKey] ?? 0) : '') : String(originalAmount)}
+                                  value={hasCurrentEdit ? (editedBudget[itemKey] !== null ? String(editedBudget[itemKey] ?? 0) : '') : String(originalAmount)}
                                   onChange={(value) => updateBudgetItem(itemKey, value)}
                                 />
                               </View>
