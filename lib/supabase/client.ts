@@ -135,7 +135,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       // Add timeout to fetch requests - fail faster to prevent request storms
       const controller = new AbortController();
       const isAuthRequest = typeof url === 'string' && url.includes('/auth/');
-      const timeout = isAuthRequest ? 15000 : 10000; // 15s for auth, 10s for others (reduced to fail faster)
+      // Reduced timeouts: 8s for auth, 5s for others - fail fast when Supabase is overloaded
+      const timeout = isAuthRequest ? 8000 : 5000;
       
       const timeoutId = setTimeout(() => {
         if (!options.signal?.aborted) {
@@ -149,12 +150,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       }).finally(() => {
         clearTimeout(timeoutId);
       }).catch((error) => {
-        // Suppress abort errors for auth requests - they're handled internally by Supabase
-        if (error.name === 'AbortError' && isAuthRequest) {
-          // Don't log - Supabase will retry internally
-          // Re-throw but don't log noisy errors
-          throw error;
-        }
+        // Suppress abort errors - they indicate server overload, not user errors
+        // Don't log or retry - just fail fast
         throw error;
       });
     },

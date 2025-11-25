@@ -188,12 +188,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please use your institutional email (@mseuf.edu.ph or @student.mseuf.edu.ph)');
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Add timeout wrapper to fail fast if Supabase is down
+      const signInPromise = supabase.auth.signInWithPassword({
         email: emailLower,
         password,
       });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Login request timed out. Supabase server may be overloaded. Please try again in a moment.')), 10000)
+      );
 
-      if (error) throw error;
+      const { data, error } = await Promise.race([signInPromise, timeoutPromise]) as any;
+
+      // Handle abort errors gracefully
+      if (error) {
+        const errorMessage = error.message || '';
+        const isAbortError = errorMessage.includes('Aborted') || 
+                            errorMessage.includes('abort') || 
+                            error.name === 'AbortError' ||
+                            errorMessage.includes('AuthRetryableFetchError') ||
+                            errorMessage.includes('upstream');
+        
+        if (isAbortError) {
+          throw new Error('Connection timeout. Supabase server appears to be overloaded. Please wait a moment and try again.');
+        }
+        throw error;
+      }
 
       if (data.user) {
         const userProfile = await fetchProfile(data.user.id);
@@ -203,7 +223,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Navigate to dashboard after successful login
       router.replace('/(tabs)/dashboard');
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      // Don't log abort errors - they're noise
+      const errorMessage = error?.message || '';
+      const isAbortError = errorMessage.includes('Aborted') || 
+                          errorMessage.includes('abort') || 
+                          error?.name === 'AbortError' ||
+                          errorMessage.includes('AuthRetryableFetchError');
+      
+      if (!isAbortError) {
+        console.error('Sign in error:', error);
+      }
       throw error;
     }
   };
