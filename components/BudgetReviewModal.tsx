@@ -62,6 +62,7 @@ export default function BudgetReviewModal({
   const { updateBudget, approveBudget, returnToSender, isSubmitting } = useComptrollerBudgetReview();
   const { profile } = useAuth();
   const scrollViewRef = useRef<ScrollView>(null);
+  const originalExpenseBreakdown = useRef<any[]>([]);
 
   // Simple swipe-to-dismiss - only on drag handle
   const translateY = useRef(new Animated.Value(0)).current;
@@ -494,24 +495,22 @@ export default function BudgetReviewModal({
                       );
                       const originalAmount = originalItem?.amount || item.amount || 0;
                       
-                      // Check if this item has been edited (either currently editing or previously saved)
+                      // Current amount from request (may have been edited and saved)
+                      const currentAmount = item.amount || 0;
+                      
+                      // Check if this item has been edited (currently editing OR saved edit differs from original)
                       const hasCurrentEdit = editedBudget[itemKey] !== undefined;
-                      const hasSavedEdit = savedEdits[itemKey] !== undefined;
-                      const hasEdit = hasCurrentEdit || hasSavedEdit;
+                      const hasSavedEdit = currentAmount !== originalAmount;
+                      const isEdited = hasCurrentEdit || hasSavedEdit;
                       
-                      // Get the edited amount - prioritize current edit, then saved edit, then original
-                      const currentEditedAmount = hasCurrentEdit ? (editedBudget[itemKey] ?? 0) : null;
-                      const savedEditedAmount = hasSavedEdit ? savedEdits[itemKey] : null;
-                      const editedAmount = currentEditedAmount !== null ? currentEditedAmount : (savedEditedAmount !== null ? savedEditedAmount : originalAmount);
+                      // Get the display amount - prioritize current edit, then current (saved) amount, then original
+                      const displayAmount = hasCurrentEdit 
+                        ? (editedBudget[itemKey] ?? 0)
+                        : (hasSavedEdit ? currentAmount : originalAmount);
                       
-                      // Item is edited if it has been modified AND the value is different from original
-                      const isEdited = hasEdit && editedAmount !== originalAmount;
                       const displayLabel = item.item === 'Other' && item.description 
                         ? item.description 
                         : (item.item || 'Other');
-                      
-                      // For display: always show edited value if edited, otherwise original
-                      const displayAmount = isEdited ? editedAmount : originalAmount;
 
                       return (
                         <View key={index} style={styles.budgetItem}>
