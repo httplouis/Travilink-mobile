@@ -766,6 +766,9 @@ export default function TravelOrderScreen() {
 
       // Build request data matching web API exactly
       // Note: request_number is NOT set - let the database trigger generate it
+      // Add a small random delay to reduce race conditions
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+      
       const requestData: any = {
         request_type: 'travel_order',
         request_number: null, // Explicitly set to null to trigger auto-generation

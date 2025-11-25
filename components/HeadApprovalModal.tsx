@@ -347,16 +347,16 @@ export default function HeadApprovalModal({
     }
   };
 
-  if (!visible) return null;
-
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.overlayBackdrop}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           style={[
             styles.modalContainer,

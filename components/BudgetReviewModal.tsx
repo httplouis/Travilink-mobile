@@ -107,18 +107,32 @@ export default function BudgetReviewModal({
     })
   ).current;
 
+  // Track saved edits to show strikethrough even after saving
+  const [savedEdits, setSavedEdits] = useState<Record<string, number>>({});
+
   // Reset when modal opens/closes
   useEffect(() => {
     if (visible) {
       translateY.setValue(0);
       // Load auto-signature settings
       loadAutoSignature();
-      // Reset editing state when modal opens
+      // Reset editing state when modal opens (but keep savedEdits to show strikethrough)
       setEditingBudget(false);
       setEditedBudget({});
       setOriginalBudget({});
       setComments('');
       setShowApproverSelection(false);
+      // Load saved edits from request if available (comptroller_edited_budget indicates edits were saved)
+      if (request.comptroller_edited_budget && request.expense_breakdown) {
+        const saved: Record<string, number> = {};
+        request.expense_breakdown.forEach((item: any) => {
+          const itemKey = item.item?.toLowerCase() || '';
+          saved[itemKey] = item.amount || 0;
+        });
+        setSavedEdits(saved);
+      } else {
+        setSavedEdits({});
+      }
     } else {
       // Clean up when modal closes
       setEditingBudget(false);
@@ -127,8 +141,9 @@ export default function BudgetReviewModal({
       setComments('');
       setSignature('');
       setShowApproverSelection(false);
+      setSavedEdits({});
     }
-  }, [visible, profile?.id]);
+  }, [visible, profile?.id, request.id]);
 
   // Load auto-signature from user settings
   const loadAutoSignature = async () => {
@@ -247,7 +262,11 @@ export default function BudgetReviewModal({
 
     if (result.success) {
       Alert.alert('Success', 'Budget changes saved successfully.');
+      // Save the edits to show strikethrough after saving
+      setSavedEdits({ ...editedBudget });
       setEditingBudget(false);
+      // Keep editedBudget so strikethrough shows
+      // Don't clear editedBudget - we want to show the strikethrough
     }
   };
 
@@ -469,19 +488,30 @@ export default function BudgetReviewModal({
                   <>
                     {expenseBreakdown.map((item: any, index: number) => {
                       const itemKey = item.item?.toLowerCase() || `item-${index}`;
-                      const originalAmount = item.amount || 0;
-                      // Check if this item has been edited
-                      const hasEdit = editedBudget[itemKey] !== undefined;
-                      // Get the edited amount - treat null as 0, undefined means not edited
-                      const editedAmount = hasEdit ? (editedBudget[itemKey] ?? 0) : originalAmount;
-                      // Item is edited if it has been modified AND the value is different
+                      // Get original amount from stored original breakdown (before any edits)
+                      const originalItem = originalExpenseBreakdown.current.find((eb: any) => 
+                        (eb.item?.toLowerCase() || eb.category?.toLowerCase() || '') === itemKey
+                      );
+                      const originalAmount = originalItem?.amount || item.amount || 0;
+                      
+                      // Check if this item has been edited (either currently editing or previously saved)
+                      const hasCurrentEdit = editedBudget[itemKey] !== undefined;
+                      const hasSavedEdit = savedEdits[itemKey] !== undefined;
+                      const hasEdit = hasCurrentEdit || hasSavedEdit;
+                      
+                      // Get the edited amount - prioritize current edit, then saved edit, then original
+                      const currentEditedAmount = hasCurrentEdit ? (editedBudget[itemKey] ?? 0) : null;
+                      const savedEditedAmount = hasSavedEdit ? savedEdits[itemKey] : null;
+                      const editedAmount = currentEditedAmount !== null ? currentEditedAmount : (savedEditedAmount !== null ? savedEditedAmount : originalAmount);
+                      
+                      // Item is edited if it has been modified AND the value is different from original
                       const isEdited = hasEdit && editedAmount !== originalAmount;
                       const displayLabel = item.item === 'Other' && item.description 
                         ? item.description 
                         : (item.item || 'Other');
                       
                       // For display: always show edited value if edited, otherwise original
-                      const displayAmount = hasEdit ? editedAmount : originalAmount;
+                      const displayAmount = isEdited ? editedAmount : originalAmount;
 
                       return (
                         <View key={index} style={styles.budgetItem}>
