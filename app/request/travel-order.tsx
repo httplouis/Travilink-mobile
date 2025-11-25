@@ -289,8 +289,8 @@ export default function TravelOrderScreen() {
       return;
     }
 
-    // Retry logic for network issues
-    const maxRetries = 2;
+    // Minimal retry logic - only 1 retry to prevent request storms
+    const maxRetries = 1;
     let lastError: any = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -336,14 +336,23 @@ export default function TravelOrderScreen() {
           return;
         }
 
-        // Retry on network errors with exponential backoff
-        if (attempt < maxRetries && (
-          error.message?.includes('network') || 
-          error.message?.includes('fetch') ||
-          error.message?.includes('timeout')
-        )) {
-          const delay = 500 * attempt; // 500ms, 1000ms
-          await new Promise(resolve => setTimeout(resolve, delay));
+        // Don't retry on network/timeout errors - they indicate Supabase is overloaded
+        // Retrying would make it worse
+        if (error.message?.includes('network') || 
+            error.message?.includes('fetch') ||
+            error.message?.includes('timeout') ||
+            error.message?.includes('upstream')) {
+          // These indicate server/network issues - don't retry, just fail
+          if (__DEV__) {
+            console.log('[fetchDepartmentHead] Network/server error - not retrying to prevent request storms');
+          }
+          return;
+        }
+        
+        // Only retry on transient database errors (very rare)
+        if (attempt < maxRetries && error.code?.startsWith('57')) {
+          // PostgreSQL connection errors - wait briefly before retry
+          await new Promise(resolve => setTimeout(resolve, 300));
           continue;
         }
 
@@ -795,8 +804,8 @@ export default function TravelOrderScreen() {
         attachments: uploadedAttachments.length > 0 ? uploadedAttachments : null,
       };
 
-      // Insert request with retry logic to handle race conditions
-      const maxRetries = 5;
+      // Insert request with minimal retry logic (only for duplicate keys, max 2 retries)
+      const maxRetries = 2; // Reduced from 5 to prevent request storms
       let request: any = null;
       let insertError: any = null;
 
@@ -813,11 +822,21 @@ export default function TravelOrderScreen() {
           break;
         }
 
+        // Only retry for duplicate key errors (race condition), not for network/abort errors
+        const isAbortError = error.message?.includes('Aborted') || error.message?.includes('abort') || error.name === 'AbortError';
+        const isTimeoutError = error.message?.includes('timeout') || error.message?.includes('Timeout');
+        
+        // Don't retry on abort/timeout - these indicate network issues, not server issues
+        if (isAbortError || isTimeoutError) {
+          insertError = error;
+          break;
+        }
+
         // If it's a duplicate key error and we have retries left, wait and retry
         if (error.code === '23505' && attempt < maxRetries) {
           console.warn(`🔄 Duplicate request number on attempt ${attempt}, retrying...`);
-          // Wait with exponential backoff: 100ms, 200ms, 400ms, 800ms
-          await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+          // Wait with shorter backoff: 200ms, 400ms (reduced from exponential to prevent storms)
+          await new Promise(resolve => setTimeout(resolve, 200 * attempt));
           continue;
         }
 

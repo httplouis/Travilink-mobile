@@ -132,10 +132,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     fetch: (url, options = {}) => {
-      // Add timeout to fetch requests, but don't timeout auth requests too aggressively
+      // Add timeout to fetch requests - fail faster to prevent request storms
       const controller = new AbortController();
       const isAuthRequest = typeof url === 'string' && url.includes('/auth/');
-      const timeout = isAuthRequest ? 30000 : 20000; // 30s for auth, 20s for others (increased to reduce abort errors)
+      const timeout = isAuthRequest ? 15000 : 10000; // 15s for auth, 10s for others (reduced to fail faster)
       
       const timeoutId = setTimeout(() => {
         if (!options.signal?.aborted) {
