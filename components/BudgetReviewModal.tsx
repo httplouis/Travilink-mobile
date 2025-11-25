@@ -470,23 +470,25 @@ export default function BudgetReviewModal({
                     {expenseBreakdown.map((item: any, index: number) => {
                       const itemKey = item.item?.toLowerCase() || `item-${index}`;
                       const originalAmount = item.amount || 0;
-                      // Get edited amount - use null if explicitly set to null, otherwise use original
+                      // Check if this item has been edited
                       const hasEdit = editedBudget[itemKey] !== undefined;
+                      // Get the edited amount - treat null as 0, undefined means not edited
                       const editedAmount = hasEdit ? (editedBudget[itemKey] ?? 0) : originalAmount;
+                      // Item is edited if it has been modified AND the value is different
                       const isEdited = hasEdit && editedAmount !== originalAmount;
                       const displayLabel = item.item === 'Other' && item.description 
                         ? item.description 
                         : (item.item || 'Other');
                       
-                      // For display: show 0 as 0, null as 0, undefined as original
-                      const displayAmount = hasEdit ? (editedBudget[itemKey] ?? 0) : originalAmount;
+                      // For display: always show edited value if edited, otherwise original
+                      const displayAmount = hasEdit ? editedAmount : originalAmount;
 
                       return (
                         <View key={index} style={styles.budgetItem}>
                           <View style={styles.budgetItemRow}>
                             <View style={styles.budgetItemLeft}>
                               <Text style={styles.budgetItemName}>{displayLabel}</Text>
-                              {isEdited && (
+                              {isEdited && !editingBudget && (
                                 <Text style={styles.editedIndicator}>EDITED</Text>
                               )}
                             </View>
@@ -501,14 +503,20 @@ export default function BudgetReviewModal({
                               </View>
                             ) : (
                               <View style={styles.budgetAmountContainer}>
-                                {isEdited && (
-                                  <Text style={styles.originalAmount}>
-                                    ₱{originalAmount.toLocaleString()}
+                                {isEdited ? (
+                                  <View style={styles.editedAmountContainer}>
+                                    <Text style={styles.originalAmount}>
+                                      ₱{originalAmount.toLocaleString()}
+                                    </Text>
+                                    <Text style={[styles.budgetAmount, styles.budgetAmountEdited]}>
+                                      ₱{displayAmount.toLocaleString()}
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  <Text style={styles.budgetAmount}>
+                                    ₱{displayAmount.toLocaleString()}
                                   </Text>
                                 )}
-                                <Text style={[styles.budgetAmount, isEdited && styles.budgetAmountEdited]}>
-                                  ₱{displayAmount.toLocaleString()}
-                                </Text>
                               </View>
                             )}
                           </View>
@@ -1059,11 +1067,16 @@ const styles = StyleSheet.create({
   budgetAmountContainer: {
     alignItems: 'flex-end',
   },
+  editedAmountContainer: {
+    alignItems: 'flex-end',
+  },
   originalAmount: {
-    fontSize: 13,
-    color: '#9ca3af',
+    fontSize: 14,
+    color: '#6b7280',
     textDecorationLine: 'line-through',
-    marginBottom: 4,
+    textDecorationColor: '#ef4444',
+    marginBottom: 2,
+    fontWeight: '500',
   },
   budgetAmount: {
     fontSize: 16,
@@ -1072,6 +1085,7 @@ const styles = StyleSheet.create({
   },
   budgetAmountEdited: {
     color: '#f59e0b',
+    fontWeight: '800',
   },
   totalBudget: {
     flexDirection: 'row',
