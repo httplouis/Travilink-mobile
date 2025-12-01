@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApproveRequest } from '@/hooks/useApproveRequest';
@@ -17,6 +18,7 @@ import SignaturePad from './SignaturePad';
 interface ApprovalActionsProps {
   requestId: string;
   role: 'head' | 'vp' | 'president' | 'hr' | 'comptroller';
+  visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
   canReturnToSender?: boolean;
@@ -25,6 +27,7 @@ interface ApprovalActionsProps {
 export default function ApprovalActions({
   requestId,
   role,
+  visible,
   onClose,
   onSuccess,
   canReturnToSender = false,
@@ -132,15 +135,20 @@ export default function ApprovalActions({
     );
   };
 
+  if (!visible) {
+    return null;
+  }
+
   return (
     <Modal
-      visible={true}
+      visible={visible}
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
               {action === 'approve' ? 'Approve Request' 
@@ -340,8 +348,8 @@ export default function ApprovalActions({
               </>
             )}
           </ScrollView>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -352,11 +360,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  overlayBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
+    width: '100%',
+    minHeight: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 2,
   },
   modalHeader: {
     flexDirection: 'row',

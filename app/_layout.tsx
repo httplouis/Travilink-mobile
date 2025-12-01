@@ -33,6 +33,7 @@ export default function RootLayout() {
               <Stack.Screen name="request/new" />
               <Stack.Screen name="request/travel-order" />
               <Stack.Screen name="request/seminar" />
+              <Stack.Screen name="review/[id]" />
               <Stack.Screen name="auth/callback" />
               <Stack.Screen name="notifications" />
               <Stack.Screen name="feedback" />

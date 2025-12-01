@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { Request } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { formatDate } from '@/lib/utils';
-import ApprovalActions from './ApprovalActions';
-import StandardizedReviewModal from './StandardizedReviewModal';
-import HeadApprovalModal from './HeadApprovalModal';
 
 interface InboxRequestCardProps {
   request: Request;
@@ -20,8 +18,6 @@ interface InboxRequestCardProps {
 }
 
 export default function InboxRequestCard({ request, role, onPress }: InboxRequestCardProps) {
-  const [showActions, setShowActions] = useState(false);
-
   const handleViewDetails = () => {
     if (onPress) {
       onPress();
@@ -59,170 +55,147 @@ export default function InboxRequestCard({ request, role, onPress }: InboxReques
   const statusColor = getStatusColor();
 
   return (
-    <TouchableOpacity onPress={handleViewDetails} activeOpacity={0.8} style={styles.cardContainer}>
-      <View style={[styles.card, isUrgent && styles.cardUrgent, isOverdue && styles.cardOverdue]}>
-        {/* Gradient Header */}
-        <View style={[styles.cardHeader, { backgroundColor: statusColor + '15' }]}>
-          <View style={styles.headerLeft}>
-            <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.requestNumber}>{request.request_number || 'DRAFT'}</Text>
-              <View style={styles.badgeRow}>
-                <View style={[styles.badge, { backgroundColor: statusColor + '20' }]}>
-                  <Text style={[styles.badgeText, { color: statusColor }]}>
-                    {request.request_type === 'travel_order' ? 'TO' : 'SA'}
-                  </Text>
+    <>
+      <TouchableOpacity onPress={handleViewDetails} activeOpacity={0.8} style={styles.cardContainer}>
+        <View style={[styles.card, isUrgent && styles.cardUrgent, isOverdue && styles.cardOverdue]}>
+          {/* Gradient Header */}
+          <View style={[styles.cardHeader, { backgroundColor: statusColor + '15' }]}>
+            <View style={styles.headerLeft}>
+              <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.requestNumber}>{request.request_number || 'DRAFT'}</Text>
+                <View style={styles.badgeRow}>
+                  <View style={[styles.badge, { backgroundColor: statusColor + '20' }]}>
+                    <Text style={[styles.badgeText, { color: statusColor }]}>
+                      {request.request_type === 'travel_order' ? 'TO' : 'SA'}
+                    </Text>
+                  </View>
+                  {isUrgent && (
+                    <View style={styles.urgentBadge}>
+                      <Ionicons name="alert-circle" size={12} color="#fff" />
+                      <Text style={styles.urgentBadgeText}>Urgent</Text>
+                    </View>
+                  )}
+                  {isOverdue && (
+                    <View style={styles.overdueBadge}>
+                      <Ionicons name="time-outline" size={12} color="#fff" />
+                      <Text style={styles.overdueBadgeText}>Overdue</Text>
+                    </View>
+                  )}
                 </View>
-                {isUrgent && (
-                  <View style={styles.urgentBadge}>
-                    <Ionicons name="alert-circle" size={12} color="#fff" />
-                    <Text style={styles.urgentBadgeText}>Urgent</Text>
-                  </View>
-                )}
-                {isOverdue && (
-                  <View style={styles.overdueBadge}>
-                    <Ionicons name="time-outline" size={12} color="#fff" />
-                    <Text style={styles.overdueBadgeText}>Overdue</Text>
-                  </View>
-                )}
               </View>
             </View>
+            <Ionicons name="chevron-forward" size={20} color={statusColor} />
           </View>
-          <Ionicons name="chevron-forward" size={20} color={statusColor} />
-        </View>
 
-        {/* Content */}
-        <View style={styles.cardContent}>
-          <View style={styles.requesterSection}>
-            <View style={styles.requesterAvatar}>
-              <Text style={styles.requesterAvatarText}>
-                {request.requester_name?.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            </View>
-            <View style={styles.requesterInfo}>
-              <Text style={styles.requesterName}>{request.requester_name}</Text>
-              <View style={styles.departmentRow}>
-                <Ionicons name="business-outline" size={12} color="#6b7280" />
-                <Text style={styles.department}>
-                  {request.department?.name || 'N/A'}
-                  {request.department?.code && ` (${request.department.code})`}
+          {/* Content */}
+          <View style={styles.cardContent}>
+            <View style={styles.requesterSection}>
+              <View style={styles.requesterAvatar}>
+                <Text style={styles.requesterAvatarText}>
+                  {request.requester_name?.charAt(0).toUpperCase() || 'U'}
                 </Text>
               </View>
-            </View>
-          </View>
-
-          <View style={styles.destinationSection}>
-            <Ionicons name="location-outline" size={16} color="#7a0019" />
-            <Text style={styles.destination} numberOfLines={2}>{request.destination}</Text>
-          </View>
-
-          <View style={styles.datesRow}>
-            <View style={styles.dateItem}>
-              <Ionicons name="calendar-outline" size={14} color="#6b7280" />
-              <Text style={styles.dateText}>
-                {request.travel_start_date ? formatDate(request.travel_start_date) : 'TBD'}
-              </Text>
-            </View>
-            {request.travel_end_date && (
-              <>
-                <Ionicons name="arrow-forward" size={12} color="#9ca3af" />
-                <View style={styles.dateItem}>
-                  <Text style={styles.dateText}>
-                    {formatDate(request.travel_end_date)}
+              <View style={styles.requesterInfo}>
+                <Text style={styles.requesterName}>{request.requester_name}</Text>
+                <View style={styles.departmentRow}>
+                  <Ionicons name="business-outline" size={12} color="#6b7280" />
+                  <Text style={styles.department}>
+                    {request.department?.name || 'N/A'}
+                    {request.department?.code && ` (${request.department.code})`}
                   </Text>
                 </View>
-              </>
-            )}
-            {daysUntil !== null && (
-              <View style={[styles.daysBadge, isUrgent && styles.daysBadgeUrgent, isOverdue && styles.daysBadgeOverdue]}>
-                <Text style={[styles.daysText, isUrgent && styles.daysTextUrgent, isOverdue && styles.daysTextOverdue]}>
-                  {isOverdue ? `${Math.abs(daysUntil)}d overdue` : daysUntil === 0 ? 'Today' : `${daysUntil}d left`}
+              </View>
+            </View>
+
+            <View style={styles.destinationSection}>
+              <Ionicons name="location-outline" size={16} color="#7a0019" />
+              <Text style={styles.destination} numberOfLines={2}>{request.destination}</Text>
+            </View>
+
+            <View style={styles.datesRow}>
+              <View style={styles.dateItem}>
+                <Ionicons name="calendar-outline" size={14} color="#6b7280" />
+                <Text style={styles.dateText}>
+                  {request.travel_start_date ? formatDate(request.travel_start_date) : 'TBD'}
                 </Text>
+              </View>
+              {request.travel_end_date && (
+                <>
+                  <Ionicons name="arrow-forward" size={12} color="#9ca3af" />
+                  <View style={styles.dateItem}>
+                    <Text style={styles.dateText}>
+                      {formatDate(request.travel_end_date)}
+                    </Text>
+                  </View>
+                </>
+              )}
+              {daysUntil !== null && (
+                <View style={[styles.daysBadge, isUrgent && styles.daysBadgeUrgent, isOverdue && styles.daysBadgeOverdue]}>
+                  <Text style={[styles.daysText, isUrgent && styles.daysTextUrgent, isOverdue && styles.daysTextOverdue]}>
+                    {isOverdue ? `${Math.abs(daysUntil)}d overdue` : daysUntil === 0 ? 'Today' : `${daysUntil}d left`}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {request.total_budget && (
+              <View style={styles.budgetRow}>
+                <View style={styles.budgetLabelContainer}>
+                  <Ionicons name="cash-outline" size={14} color="#6b7280" />
+                  <Text style={styles.budgetLabel}>Budget</Text>
+                </View>
+                <View style={styles.budgetAmountContainer}>
+                  <Text style={styles.budgetAmount}>₱{request.total_budget.toLocaleString()}</Text>
+                  {request.total_budget >= 15000 && (
+                    <View style={styles.highBudgetBadge}>
+                      <Ionicons name="trending-up" size={10} color="#dc2626" />
+                      <Text style={styles.highBudgetText}>High</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
           </View>
 
-          {request.total_budget && (
-            <View style={styles.budgetRow}>
-              <View style={styles.budgetLabelContainer}>
-                <Ionicons name="cash-outline" size={14} color="#6b7280" />
-                <Text style={styles.budgetLabel}>Budget</Text>
-              </View>
-              <View style={styles.budgetAmountContainer}>
-                <Text style={styles.budgetAmount}>₱{request.total_budget.toLocaleString()}</Text>
-                {request.total_budget >= 15000 && (
-                  <View style={styles.highBudgetBadge}>
-                    <Ionicons name="trending-up" size={10} color="#dc2626" />
-                    <Text style={styles.highBudgetText}>High</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={styles.viewButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleViewDetails();
+              }}
+            >
+              <Ionicons name="eye-outline" size={16} color="#7a0019" />
+              <Text style={styles.viewButtonText}>View Details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.approveButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                // For comptroller with custom onPress, use that instead
+                if (role === 'comptroller' && onPress) {
+                  onPress();
+                } else {
+                  // Navigate to review screen for all roles
+                  const reviewUrl = `/review/${request.id}?role=${role}`;
+                  console.log('[InboxRequestCard] Navigating to review screen:', {
+                    requestId: request.id,
+                    role: role,
+                    url: reviewUrl
+                  });
+                  router.push(reviewUrl as any);
+                }
+              }}
+            >
+              <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+              <Text style={styles.approveButtonText}>Review</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+      </TouchableOpacity>
 
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={styles.viewButton}
-            onPress={handleViewDetails}
-          >
-            <Ionicons name="eye-outline" size={16} color="#7a0019" />
-            <Text style={styles.viewButtonText}>View Details</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.approveButton}
-            onPress={() => {
-              // For comptroller with custom onPress, use that instead of StandardizedReviewModal
-              if (role === 'comptroller' && onPress) {
-                onPress();
-              } else {
-                setShowActions(true);
-              }
-            }}
-          >
-            <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-            <Text style={styles.approveButtonText}>Review</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {showActions && (
-        role === 'head' ? (
-          <HeadApprovalModal
-            visible={showActions}
-            request={request}
-            onClose={() => setShowActions(false)}
-            isHistory={request.status !== 'pending_head' && request.status !== 'pending_parent_head'}
-          />
-        ) : role === 'hr' || role === 'vp' || role === 'president' ? (
-          <StandardizedReviewModal
-            requestId={request.id}
-            role={role}
-            onClose={() => setShowActions(false)}
-            onSuccess={() => {
-              setShowActions(false);
-              // Query invalidation in useApproveRequest will trigger refresh
-            }}
-            canReturnToSender={true}
-          />
-        ) : role === 'comptroller' ? (
-          // Comptroller should use BudgetReviewModal, not StandardizedReviewModal
-          // This should only show if onPress wasn't provided (fallback)
-          null
-        ) : (
-          <ApprovalActions
-            requestId={request.id}
-            role={role}
-            onClose={() => setShowActions(false)}
-            onSuccess={() => {
-              setShowActions(false);
-              // Query invalidation in useApproveRequest will trigger refresh
-            }}
-            canReturnToSender={true}
-          />
-        )
-      )}
-    </TouchableOpacity>
+    </>
   );
 }
 

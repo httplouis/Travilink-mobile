@@ -21,12 +21,28 @@ export function useSignatureSettings() {
           .eq('id', profile.id)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Handle missing columns gracefully (error code 42703 = column does not exist)
+          if (error.code === '42703' || error.code === 'PGRST116') {
+            console.log('Signature columns not found, using defaults');
+            setSignature(null);
+            setAutoSignature(null);
+            setIsAutoSignEnabled(false);
+            setLoading(false);
+            return;
+          }
+          throw error;
+        }
+        
         setSignature(data?.signature_url || null);
         setAutoSignature(data?.automatic_signature || null);
         setIsAutoSignEnabled(data?.is_auto_sign_enabled || false);
-      } catch (error) {
-        console.error('Error fetching signature:', error);
+      } catch (error: any) {
+        // Log error but don't crash the app
+        console.error('Error fetching signature:', error?.message || error);
+        setSignature(null);
+        setAutoSignature(null);
+        setIsAutoSignEnabled(false);
       } finally {
         setLoading(false);
       }

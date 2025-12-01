@@ -1,0 +1,184 @@
+==========================================
+TRAVILINK MOBILE - MOBILE-ONLY LIBRARIES LIST
+==========================================
+
+Generated: 2025
+Project: TraviLink Mobile Application
+Platform: React Native (Expo)
+
+NOTE: This list includes ONLY libraries/APIs/modules that are 
+      UNIQUE to the mobile app and NOT shared with the web version.
+
+==========================================
+MOBILE-ONLY PRODUCTION DEPENDENCIES
+==========================================
+
+EXPO FRAMEWORK (Mobile-Only)
+----------------------------
+expo                               ~54.0.25        Expo SDK - Mobile app framework
+expo-router                        ~6.0.15         File-based routing for mobile
+expo-auth-session                  ^7.0.9          OAuth authentication for mobile
+expo-constants                     ~18.0.10        App constants and configuration
+expo-document-picker               ^14.0.7         Document/file picking
+expo-file-system                   ^19.0.19        File system access
+expo-image-picker                  ^17.0.8         Image picking from gallery/camera
+expo-linking                       ~8.0.9          Deep linking and universal links
+expo-location                      ^19.0.7         Location services
+expo-maps                          ^0.12.8         Maps component (native)
+expo-secure-store                  ~15.0.7         Secure encrypted storage
+expo-sharing                       ^14.0.7         Share files/content with other apps
+expo-status-bar                    ~3.0.8          Status bar control
+expo-web-browser                   ^15.0.9         In-app browser
+
+REACT NATIVE CORE (Mobile-Only)
+--------------------------------
+react-native                       0.81.5          React Native framework
+react-native-calendars             ^1.1301.0       Calendar components
+react-native-gesture-handler       ~2.28.0         Touch gesture handling
+react-native-reanimated            ~4.1.1          High-performance animations
+react-native-safe-area-context     ~5.6.0          Safe area handling
+react-native-screens               ~4.16.0         Native screen management
+react-native-signature-canvas      ^5.0.1          Signature pad component
+react-native-web                   ^0.21.0         Web platform support for RN
+react-native-webview               ^13.15.0        WebView component
+react-native-worklets              ^0.5.1          JavaScript worklets for animations
+
+REACT NATIVE UTILITIES (Mobile-Only)
+-------------------------------------
+@react-native-async-storage/async-storage  ^2.2.0    Async key-value storage
+@react-native-community/datetimepicker     ^8.4.4    Native date/time pickers
+
+UI & ICONS (Mobile-Only)
+-------------------------
+@expo/vector-icons                 ^15.0.3         Icon library (Ionicons, FontAwesome, etc.)
+
+DATA FETCHING (Mobile-Only)
+----------------------------
+@tanstack/react-query              ^5.0.0          Data fetching & caching
+                                                  (Web uses SWR instead)
+
+==========================================
+MOBILE-ONLY DEVELOPMENT DEPENDENCIES
+==========================================
+
+TYPE DEFINITIONS (Mobile-Only)
+-------------------------------
+@types/react-native                ^0.72.8         TypeScript types for React Native
+
+ENVIRONMENT VARIABLES (Mobile-Only)
+------------------------------------
+cross-env                          ^10.1.0         Cross-platform environment variables
+
+==========================================
+LIBRARY DETAILS & PURPOSE
+==========================================
+
+EXPO ECOSYSTEM
+---------------
+All Expo packages provide mobile-specific functionality:
+- expo: Core SDK providing unified APIs across iOS, Android, and Web
+- expo-router: File-based routing system (replaces React Navigation)
+- expo-auth-session: OAuth flows for mobile authentication
+- expo-secure-store: Encrypted storage for sensitive data (tokens, passwords)
+- expo-location: GPS and location services access
+- expo-maps: Native map components (uses Google Maps on native platforms)
+- expo-file-system: Read/write files to device storage
+- expo-document-picker: Native file picker dialogs
+- expo-image-picker: Access device camera and photo gallery
+- expo-sharing: Share content with other installed apps
+- expo-constants: Access app version, build info, etc.
+- expo-linking: Handle deep links and universal links
+- expo-status-bar: Control status bar appearance and style
+- expo-web-browser: Open URLs in in-app browser
+
+REACT NATIVE FRAMEWORK
+-----------------------
+- react-native: Core React Native framework for building native mobile apps
+- react-native-web: Enables React Native components to work on web platform
+- react-native-screens: Native screen components for better performance
+- react-native-safe-area-context: Handle notches, status bars, and safe areas
+- react-native-gesture-handler: Declarative gesture API for touch interactions
+- react-native-reanimated: High-performance animation library using native driver
+- react-native-worklets: JavaScript functions that run on UI thread
+
+REACT NATIVE UI COMPONENTS
+---------------------------
+- react-native-calendars: Calendar views and date pickers for mobile
+- react-native-signature-canvas: Signature pad with drawing support
+- react-native-webview: Render web content in native WebView
+
+REACT NATIVE UTILITIES
+-----------------------
+- @react-native-async-storage/async-storage: Persistent key-value storage
+- @react-native-community/datetimepicker: Native date/time picker dialogs
+
+UI COMPONENTS
+-------------
+- @expo/vector-icons: Comprehensive icon library with thousands of icons
+
+DATA MANAGEMENT
+---------------
+- @tanstack/react-query: Advanced data fetching with automatic caching,
+  background updates, optimistic updates, and error handling
+  (Mobile uses React Query, web uses SWR)
+
+DEVELOPMENT TOOLS
+-----------------
+- @types/react-native: TypeScript type definitions for React Native
+- cross-env: Set environment variables cross-platform (Windows/Mac/Linux)
+
+==========================================
+KEY MOBILE-ONLY FEATURES ENABLED
+==========================================
+
+✓ Native mobile navigation (expo-router)
+✓ Secure token storage (expo-secure-store)
+✓ Location services & GPS (expo-location)
+✓ Native maps (expo-maps)
+✓ Camera & photo gallery access (expo-image-picker)
+✓ File system access (expo-file-system)
+✓ Document picking (expo-document-picker)
+✓ Share content with other apps (expo-sharing)
+✓ Signature capture (react-native-signature-canvas)
+✓ Native calendar views (react-native-calendars)
+✓ Smooth native animations (react-native-reanimated)
+✓ Touch gesture handling (react-native-gesture-handler)
+✓ Safe area handling (react-native-safe-area-context)
+✓ Advanced data fetching (React Query)
+✓ Native date/time pickers
+
+==========================================
+EXCLUDED FROM THIS LIST (Shared with Web)
+==========================================
+
+The following libraries are used in BOTH mobile and web, so they are
+NOT included in this mobile-only list:
+
+SHARED DEPENDENCIES:
+- @supabase/supabase-js (Both use Supabase)
+- date-fns (Both use for date formatting)
+- react (Both use React)
+- react-dom (Both use React DOM)
+- typescript (Both use TypeScript)
+
+==========================================
+TOTAL MOBILE-ONLY DEPENDENCIES COUNT
+==========================================
+
+Production Dependencies: 26
+Development Dependencies: 2
+Total: 28 mobile-only packages
+
+==========================================
+NOTES
+==========================================
+
+- All Expo packages are versioned with Expo SDK 54
+- React Native 0.81.5 is the latest stable version
+- These libraries are specifically for mobile app development
+- Most are actively maintained and up-to-date
+- Cross-platform support: iOS, Android, and Web (via react-native-web)
+
+==========================================
+END OF MOBILE-ONLY LIBRARIES LIST
+==========================================

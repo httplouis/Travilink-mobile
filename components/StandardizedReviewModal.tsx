@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -20,6 +21,7 @@ import { formatDateTime } from '@/lib/utils';
 interface StandardizedReviewModalProps {
   requestId: string;
   role: 'hr' | 'vp' | 'president' | 'comptroller';
+  visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
   canReturnToSender?: boolean;
@@ -35,6 +37,7 @@ interface ApprovalHistory {
 export default function StandardizedReviewModal({
   requestId,
   role,
+  visible,
   onClose,
   onSuccess,
   canReturnToSender = false,
@@ -49,7 +52,7 @@ export default function StandardizedReviewModal({
   const { approveRequest, isSubmitting } = useApproveRequest();
 
   // Fetch request details and approval history
-  const { data: requestData, isLoading: isLoadingRequest } = useQuery({
+  const { data: requestData, isLoading: isLoadingRequest, error: requestError } = useQuery({
     queryKey: ['request-review', requestId],
     queryFn: async () => {
       // Fetch request with all approver details
@@ -97,9 +100,6 @@ export default function StandardizedReviewModal({
         vp_approver: request.vp_approved_by ? approversMap[request.vp_approved_by] : null,
         president_approver: request.president_approved_by ? approversMap[request.president_approved_by] : null,
       };
-
-      if (error) throw error;
-      return request;
     },
     enabled: !!requestId,
   });
@@ -268,28 +268,42 @@ export default function StandardizedReviewModal({
     }
   };
 
+  if (!visible) {
+    return null;
+  }
+
+  // Always show the modal structure - don't wait for data
   if (isLoadingRequest) {
     return (
-      <Modal visible={true} transparent animationType="slide" onRequestClose={onClose}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ActivityIndicator size="large" color="#7a0019" />
-            <Text style={styles.loadingText}>Loading request details...</Text>
-          </View>
-        </View>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+        <Pressable style={styles.modalOverlay} onPress={onClose}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{getRoleTitle()}</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.modalBody, { alignItems: 'center', justifyContent: 'center', minHeight: 200 }]}>
+              <ActivityIndicator size="large" color="#7a0019" />
+              <Text style={styles.loadingText}>Loading request details...</Text>
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     );
   }
 
   return (
     <Modal
-      visible={true}
+      visible={visible}
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{getRoleTitle()}</Text>
             <TouchableOpacity onPress={onClose}>
@@ -303,6 +317,35 @@ export default function StandardizedReviewModal({
             showsVerticalScrollIndicator={false}
             scrollEnabled={scrollEnabled}
           >
+            {/* Always show action buttons first if no action selected */}
+            {!action && (
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.approveButton]}
+                  onPress={() => setAction('approve')}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                  <Text style={styles.actionButtonText}>Approve</Text>
+                </TouchableOpacity>
+                {canReturnToSender && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.returnButton]}
+                    onPress={() => setAction('return')}
+                  >
+                    <Ionicons name="arrow-undo" size={24} color="#fff" />
+                    <Text style={styles.actionButtonText}>Return to Sender</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.rejectButton]}
+                  onPress={() => setAction('reject')}
+                >
+                  <Ionicons name="close-circle" size={24} color="#fff" />
+                  <Text style={styles.actionButtonText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Approval History */}
             {approvalHistory.length > 0 && (
               <View style={styles.section}>
@@ -366,33 +409,7 @@ export default function StandardizedReviewModal({
               </View>
             )}
 
-            {!action ? (
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.approveButton]}
-                  onPress={() => setAction('approve')}
-                >
-                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                  <Text style={styles.actionButtonText}>Approve</Text>
-                </TouchableOpacity>
-                {canReturnToSender && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.returnButton]}
-                    onPress={() => setAction('return')}
-                  >
-                    <Ionicons name="arrow-undo" size={24} color="#fff" />
-                    <Text style={styles.actionButtonText}>Return to Sender</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.rejectButton]}
-                  onPress={() => setAction('reject')}
-                >
-                  <Ionicons name="close-circle" size={24} color="#fff" />
-                  <Text style={styles.actionButtonText}>Reject</Text>
-                </TouchableOpacity>
-              </View>
-            ) : action === 'approve' ? (
+            {action === 'approve' ? (
               <>
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Comments (Optional)</Text>
@@ -543,8 +560,8 @@ export default function StandardizedReviewModal({
               </>
             )}
           </ScrollView>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -555,11 +572,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  overlayBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
+    width: '100%',
+    minHeight: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 2,
   },
   modalHeader: {
     flexDirection: 'row',
