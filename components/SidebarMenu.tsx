@@ -150,6 +150,15 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
             },
           ]}
         >
+          {/* Logo Header */}
+          <View style={styles.logoHeader}>
+            <Image
+              source={require('@/assets/travelink.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
+
           {/* Profile Header - Teams-inspired */}
           <View style={styles.profileHeader}>
             <TouchableOpacity
@@ -291,9 +300,22 @@ const styles = StyleSheet.create({
     elevation: 10,
     justifyContent: 'space-between',
   },
-  profileHeader: {
+  logoHeader: {
     padding: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+  },
+  profileHeader: {
+    padding: 20,
+    paddingTop: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     flexDirection: 'row',

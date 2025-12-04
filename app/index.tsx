@@ -1,6 +1,6 @@
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Image, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 
 export default function Index() {
@@ -18,8 +18,13 @@ export default function Index() {
   // Show loading spinner while checking auth (first 3 seconds)
   if (loading || (!hasWaited && !session)) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
-        <ActivityIndicator size="large" color="#7a0019" />
+      <View style={styles.loadingContainer}>
+        <Image
+          source={require('@/assets/travelink.png')}
+          style={styles.loadingLogo}
+          resizeMode="contain"
+        />
+        <ActivityIndicator size="large" color="#7a0019" style={{ marginTop: 24 }} />
       </View>
     );
   }
@@ -38,8 +43,13 @@ export default function Index() {
   // Still loading profile
   if (!profile) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
-        <ActivityIndicator size="large" color="#7a0019" />
+      <View style={styles.loadingContainer}>
+        <Image
+          source={require('@/assets/travelink.png')}
+          style={styles.loadingLogo}
+          resizeMode="contain"
+        />
+        <ActivityIndicator size="large" color="#7a0019" style={{ marginTop: 24 }} />
       </View>
     );
   }
@@ -47,4 +57,17 @@ export default function Index() {
   // Both session and profile exist - redirect to dashboard
   return <Redirect href="/(tabs)/dashboard" />;
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  loadingLogo: {
+    width: 120,
+    height: 120,
+  },
+});
 
