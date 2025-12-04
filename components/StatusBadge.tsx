@@ -111,7 +111,7 @@ export default function StatusBadge({
   showIcon = true,
 }: StatusBadgeProps) {
   const config = STATUS_CONFIG[status] || {
-    label: status,
+    label: String(status || 'Unknown'),
     color: '#6b7280',
     bgColor: '#f3f4f6',
     icon: 'help-circle',
