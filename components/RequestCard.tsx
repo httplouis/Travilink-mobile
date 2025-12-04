@@ -214,8 +214,13 @@ const styles = StyleSheet.create({
   progressContainer: {
     marginTop: 12,
     paddingTop: 12,
+    paddingBottom: 8,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    backgroundColor: '#fafbfc',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    marginHorizontal: -4,
   },
   progressLabel: {
     fontSize: 11,
