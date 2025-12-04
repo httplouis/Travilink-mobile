@@ -676,18 +676,62 @@ export default function TravelOrderScreen() {
       let requesterName = profile.name;
       
       if (isRepresentativeSubmission && formData.requestingPerson !== profile.name) {
-        // Search for requesting person
-        const { data: users } = await supabase
+        // Search for requesting person - improved search with multiple attempts
+        const searchName = formData.requestingPerson.trim();
+        let matchedUser: any = null;
+        
+        // Try multiple search strategies
+        // 1. Exact match (case-insensitive)
+        let { data: users } = await supabase
           .from('users')
           .select('id, name, is_head, role, department_id')
-          .ilike('name', `%${formData.requestingPerson}%`)
+          .ilike('name', `%${searchName}%`)
           .eq('status', 'active')
-          .limit(5);
+          .limit(20); // Increase limit to find more matches
 
-        const exactMatch = users?.find(u => 
-          u.name?.toLowerCase().trim() === formData.requestingPerson.toLowerCase().trim()
-        );
-        const matchedUser = exactMatch || users?.[0];
+        if (users && users.length > 0) {
+          // Try exact match first
+          matchedUser = users.find(u => 
+            u.name?.toLowerCase().trim() === searchName.toLowerCase().trim()
+          );
+          
+          // If no exact match, try partial match (first name + last name)
+          if (!matchedUser) {
+            const nameParts = searchName.toLowerCase().split(/\s+/).filter(p => p.length > 2);
+            matchedUser = users.find(u => {
+              const uName = u.name?.toLowerCase() || '';
+              return nameParts.every(part => uName.includes(part));
+            });
+          }
+          
+          // If still no match, try first or last name match
+          if (!matchedUser && nameParts.length > 0) {
+            matchedUser = users.find(u => {
+              const uName = u.name?.toLowerCase() || '';
+              return nameParts.some(part => uName.includes(part));
+            });
+          }
+          
+          // Fallback to first result
+          if (!matchedUser) {
+            matchedUser = users[0];
+          }
+        }
+        
+        // If still not found, try without status filter (RLS might be blocking)
+        if (!matchedUser) {
+          const { data: allUsers } = await supabase
+            .from('users')
+            .select('id, name, is_head, role, department_id')
+            .ilike('name', `%${searchName}%`)
+            .limit(20);
+          
+          if (allUsers && allUsers.length > 0) {
+            matchedUser = allUsers.find(u => 
+              u.name?.toLowerCase().trim() === searchName.toLowerCase().trim()
+            ) || allUsers[0];
+          }
+        }
 
         if (matchedUser) {
           requesterId = matchedUser.id;
@@ -701,7 +745,7 @@ export default function TravelOrderScreen() {
         } else if (status === 'submitted') {
           Alert.alert(
             'Error',
-            `Cannot find user "${formData.requestingPerson}" in the system. Please check the spelling.`
+            `Cannot find user "${formData.requestingPerson}" in the system. Please check the spelling or select from the dropdown.`
           );
           setSubmitting(false);
           return;
@@ -766,12 +810,10 @@ export default function TravelOrderScreen() {
 
       // Build request data matching web API exactly
       // Note: request_number is NOT set - let the database trigger generate it
-      // Add a small random delay to reduce race conditions
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
       
       const requestData: any = {
         request_type: 'travel_order',
-        request_number: null, // Explicitly set to null to trigger auto-generation
+        // DO NOT include request_number - let database generate it
         title: formData.purposeOfTravel || 'Travel Request',
         purpose: formData.purposeOfTravel || 'Travel Request',
         destination: formData.destination || 'TBD',
@@ -799,7 +841,10 @@ export default function TravelOrderScreen() {
         current_approver_role: 
           initialStatus === 'pending_head' || initialStatus === 'pending_requester_signature' ? 'head' :
           initialStatus === 'pending_admin' ? 'admin' :
+          initialStatus === 'pending_comptroller' ? 'comptroller' :
           initialStatus === 'pending_hr' ? 'hr' :
+          initialStatus === 'pending_vp' ? 'vp' :
+          initialStatus === 'pending_president' ? 'president' :
           initialStatus === 'pending_exec' ? 'exec' : null,
         head_signature: requesterIsHead ? null : (formData.endorsedByHeadSignature || null),
         requester_contact_number: formData.requesterContactNumber || null,
@@ -807,25 +852,50 @@ export default function TravelOrderScreen() {
         attachments: uploadedAttachments.length > 0 ? uploadedAttachments : null,
       };
 
-      // Insert request with retry logic for duplicate key errors (race conditions)
-      // Note: Database uses sequences for thread-safe number generation, but collisions can still
-      // occur if multiple requests with same requester/driver are submitted simultaneously
-      const maxRetries = 3; // 3 retries should handle most race conditions
+      // Insert request - EXPLICITLY set request_number to NULL so the database trigger generates it
+      // The trigger checks "IF NEW.request_number IS NULL" so we MUST set it to null explicitly
+      const insertData: any = {
+        ...requestData,
+        request_number: null, // EXPLICITLY set to null to trigger database generation
+      };
+      
+      console.log('[TravelOrder] Inserting request with request_number explicitly set to NULL for database trigger');
+      
+      const maxRetries = 8; // Increased retries
       let request: any = null;
       let insertError: any = null;
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
+          // Add exponential backoff delay between retries
+          if (attempt > 1) {
+            const baseDelay = 1000 * Math.pow(2, attempt - 2); // 1000ms, 2000ms, 4000ms, etc.
+            const jitter = Math.random() * 300; // 0-300ms random jitter
+            const delay = baseDelay + jitter;
+            console.log(`[TravelOrder] Retry attempt ${attempt}, waiting ${Math.round(delay)}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+
           const { data, error } = await supabase
             .from('requests')
-            .insert(requestData)
+            .insert(insertData)
             .select()
             .single();
 
-          if (!error) {
+          if (!error && data) {
+            console.log(`✅ Request created successfully on attempt ${attempt}:`, data.request_number);
             request = data;
             insertError = null;
             break;
+          }
+          
+          // Log error details for debugging
+          if (error) {
+            console.warn(`[TravelOrder] Insert error on attempt ${attempt}:`, {
+              code: error.code,
+              message: error.message?.substring(0, 100),
+              isDuplicate: error.code === '23505',
+            });
           }
 
           // Only retry for duplicate key errors (race condition), not for network/abort errors
@@ -841,20 +911,20 @@ export default function TravelOrderScreen() {
           // Check if it's a duplicate key error on request_number
           const isDuplicateKey = error.code === '23505' && (
             error.message?.includes('request_number') || 
+            error.message?.includes('requests_request_number_key') ||
             error.details?.includes('request_number') ||
             error.hint?.includes('request_number')
           );
 
-          // If it's a duplicate key error and we have retries left, wait and retry
+          // If it's a duplicate key error, retry with minimal delay
+          // PostgreSQL sequences are atomic, so this should be rare
           if (isDuplicateKey && attempt < maxRetries) {
-            console.warn(`🔄 Duplicate request number detected on attempt ${attempt}, retrying...`);
-            // Exponential backoff with jitter: 300-400ms, 600-800ms, 1200-1500ms
-            const baseDelay = 300 * Math.pow(2, attempt - 1);
-            const jitter = Math.random() * 100; // Add 0-100ms random jitter to prevent thundering herd
-            const backoffDelay = baseDelay + jitter;
-            await new Promise(resolve => setTimeout(resolve, backoffDelay));
-            // Ensure request_number is null to force database to regenerate (with next sequence number)
-            requestData.request_number = null;
+            console.warn(`🔄 Duplicate request number detected on attempt ${attempt}/${maxRetries}, retrying...`);
+            // Minimal delay - sequences are atomic, just need a tiny gap
+            const delay = 100 + Math.random() * 200; // 100-300ms
+            await new Promise(resolve => setTimeout(resolve, delay));
+            // Ensure request_number is explicitly null for retry
+            insertData.request_number = null;
             continue;
           }
 
@@ -869,7 +939,7 @@ export default function TravelOrderScreen() {
       }
 
       if (insertError || !request) {
-        console.error('Request submission error:', insertError);
+        console.error('Request submission error after', maxRetries, 'attempts:', insertError);
         throw insertError || new Error('Failed to create request after retries');
       }
 
@@ -886,29 +956,191 @@ export default function TravelOrderScreen() {
           : 'Request created and submitted',
       });
 
-      // Create notification for submitter
-      await supabase.from('notifications').insert({
-        user_id: profile.id,
-        notification_type: 'request_submitted',
-        title: 'Request Submitted',
-        message: `Your travel order request ${request.request_number || 'has been submitted'} and is now pending approval.`,
-        related_type: 'request',
-        related_id: request.id,
-        action_url: `/request/${request.id}`,
-        priority: 'normal',
-      });
-
-      // If representative submission, notify requester
-      if (isRepresentativeSubmission && requesterId !== profile.id) {
+      // Create notification for submitter (silently fail if RLS blocks it)
+      try {
         await supabase.from('notifications').insert({
-          user_id: requesterId,
-          notification_type: 'request_pending_signature',
-          title: 'Signature Required',
-          message: `${profile.name} submitted a travel order request on your behalf. Please sign to proceed.`,
+          user_id: profile.id,
+          notification_type: 'request_submitted',
+          title: 'Request Submitted',
+          message: `Your travel order request ${request.request_number || 'has been submitted'} and is now pending approval.`,
           related_type: 'request',
           related_id: request.id,
           action_url: `/request/${request.id}`,
-          priority: 'high',
+          priority: 'normal',
+        });
+      } catch (notifError: any) {
+        // Silently handle notification errors - not critical
+        console.warn('[TravelOrder] Notification creation failed (non-critical):', notifError?.code);
+      }
+
+      // If representative submission, notify requester (silently fail if RLS blocks it)
+      if (isRepresentativeSubmission && requesterId !== profile.id) {
+        try {
+          await supabase.from('notifications').insert({
+            user_id: requesterId,
+            notification_type: 'request_pending_signature',
+            title: 'Signature Required',
+            message: `${profile.name} submitted a travel order request on your behalf. Please sign to proceed.`,
+            related_type: 'request',
+            related_id: request.id,
+            action_url: `/request/${request.id}`,
+            priority: 'high',
+          });
+        } catch (notifError: any) {
+          // Silently handle notification errors - not critical
+          console.warn('[TravelOrder] Notification creation failed (non-critical):', notifError?.code);
+        }
+      }
+
+      // Notify next approver based on initial status
+      console.log('[TravelOrder] Notification check:', {
+        initialStatus,
+        hasBudget,
+        requestNumber: request.request_number,
+        requestId: request.id,
+        condition: initialStatus === 'pending_comptroller' && hasBudget,
+      });
+      
+      try {
+        const { notifyNextApprover } = await import('@/lib/notifications');
+        
+        if (initialStatus === 'pending_comptroller' && hasBudget) {
+          console.log('[TravelOrder] Creating notifications for comptroller...');
+          // Find ALL comptroller users and notify each one
+          const { data: comptrollerUsers, error: comptrollerError } = await supabase
+            .from('users')
+            .select('id, name')
+            .eq('is_comptroller', true)
+            .eq('is_active', true);
+          
+          if (comptrollerError) {
+            console.error('[TravelOrder] Error fetching comptrollers:', comptrollerError);
+          } else if (comptrollerUsers && comptrollerUsers.length > 0) {
+            console.log(`[TravelOrder] Found ${comptrollerUsers.length} comptroller(s) to notify:`, comptrollerUsers.map(u => ({ id: u.id, name: u.name })));
+            // Notify all comptrollers
+            const notificationPromises = comptrollerUsers.map(comptroller =>
+              notifyNextApprover(
+                comptroller.id,
+                request.id,
+                request.request_number || 'DRAFT',
+                requesterName,
+                'comptroller'
+              ).catch(err => {
+                console.error(`[TravelOrder] Failed to notify comptroller ${comptroller.id}:`, {
+                  error: err,
+                  message: err?.message,
+                  code: err?.code,
+                  stack: err?.stack?.substring(0, 200),
+                });
+                return false;
+              })
+            );
+            
+            const results = await Promise.all(notificationPromises);
+            const successCount = results.filter(r => r === true).length;
+            console.log(`[TravelOrder] Notification results:`, {
+              total: results.length,
+              success: successCount,
+              failed: results.length - successCount,
+              results: results,
+            });
+            if (successCount > 0) {
+              console.log(`[TravelOrder] ✅ Notified ${successCount}/${comptrollerUsers.length} comptroller(s) for request ${request.request_number}`);
+            } else {
+              console.error(`[TravelOrder] ❌ Failed to notify any comptrollers for request ${request.request_number}`);
+            }
+          } else {
+            console.warn('[TravelOrder] No active comptroller users found to notify');
+          }
+        } else if (initialStatus === 'pending_head') {
+          // Find department head and notify
+          if (departmentId) {
+            const { data: headUsers, error: headError } = await supabase
+              .from('users')
+              .select('id, name')
+              .eq('department_id', departmentId)
+              .eq('is_head', true)
+              .eq('is_active', true)
+              .limit(1);
+            
+            if (headError) {
+              console.error('[TravelOrder] Error fetching head:', headError);
+            } else if (headUsers && headUsers.length > 0) {
+              try {
+                const success = await notifyNextApprover(
+                  headUsers[0].id,
+                  request.id,
+                  request.request_number || 'DRAFT',
+                  requesterName,
+                  'head'
+                );
+                if (success) {
+                  console.log(`[TravelOrder] ✅ Notified head ${headUsers[0].id} for request ${request.request_number}`);
+                } else {
+                  console.error(`[TravelOrder] ❌ Failed to notify head ${headUsers[0].id} for request ${request.request_number}`);
+                }
+              } catch (headNotifErr: any) {
+                console.error('[TravelOrder] Exception notifying head:', {
+                  error: headNotifErr,
+                  message: headNotifErr?.message,
+                  code: headNotifErr?.code,
+                });
+              }
+            } else {
+              console.warn('[TravelOrder] No active head users found in department', departmentId);
+            }
+          }
+        } else if (initialStatus === 'pending_admin') {
+          // Find admin users and notify
+          const { data: adminUsers, error: adminError } = await supabase
+            .from('users')
+            .select('id, name')
+            .eq('is_admin', true)
+            .eq('is_active', true)
+            .limit(5); // Notify up to 5 admins
+          
+          if (adminError) {
+            console.error('[TravelOrder] Error fetching admins:', adminError);
+          } else if (adminUsers && adminUsers.length > 0) {
+            const notificationPromises = adminUsers.map(admin =>
+              notifyNextApprover(
+                admin.id,
+                request.id,
+                request.request_number || 'DRAFT',
+                requesterName,
+                'admin'
+              ).catch(err => {
+                console.error(`[TravelOrder] Failed to notify admin ${admin.id}:`, {
+                  error: err,
+                  message: err?.message,
+                  code: err?.code,
+                  stack: err?.stack?.substring(0, 200),
+                });
+                return false;
+              })
+            );
+            
+            const results = await Promise.all(notificationPromises);
+            const successCount = results.filter(r => r === true).length;
+            if (successCount > 0) {
+              console.log(`[TravelOrder] ✅ Notified ${successCount}/${adminUsers.length} admin(s) for request ${request.request_number}`);
+            } else {
+              console.error(`[TravelOrder] ❌ Failed to notify any admins for request ${request.request_number}`);
+            }
+          } else {
+            console.warn('[TravelOrder] No active admin users found to notify');
+          }
+        }
+      } catch (notifError: any) {
+        // Log full error details for debugging
+        console.error('[TravelOrder] Next approver notification failed:', {
+          error: notifError,
+          message: notifError?.message,
+          code: notifError?.code,
+          stack: notifError?.stack?.substring(0, 200),
+          initialStatus,
+          hasBudget,
+          requestNumber: request.request_number,
         });
       }
 
@@ -939,9 +1171,9 @@ export default function TravelOrderScreen() {
       let showRetry = false;
       
       if (error.code === '23505') {
-        // Duplicate key error (likely request_number) - should be rare now with retry logic
+        // Duplicate key error (likely request_number)
         errorTitle = 'Submission Conflict';
-        errorMessage = 'We encountered a conflict while creating your request. This usually happens when multiple requests are submitted at the same time.';
+        errorMessage = 'A request with the same number already exists. Please try again - the system will generate a new request number.';
         showRetry = true;
       } else if (error.code === '23503') {
         // Foreign key constraint
@@ -1046,23 +1278,57 @@ export default function TravelOrderScreen() {
                 style={styles.fillCurrentButton}
                 onPress={() => {
                   if (profile) {
+                    // Add randomization to prevent identical submissions
                     const today = new Date();
-                    const tomorrow = new Date(today);
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    const dayAfter = new Date(tomorrow);
-                    dayAfter.setDate(dayAfter.getDate() + 1);
+                    const randomDaysAhead = Math.floor(Math.random() * 30) + 1; // 1-30 days ahead
+                    const randomDuration = Math.floor(Math.random() * 7) + 1; // 1-7 days duration
+                    
+                    const departureDate = new Date(today);
+                    departureDate.setDate(departureDate.getDate() + randomDaysAhead);
+                    
+                    const returnDate = new Date(departureDate);
+                    returnDate.setDate(returnDate.getDate() + randomDuration);
+                    
+                    // Random destinations to prevent identical submissions
+                    const destinations = [
+                      'Manila, Philippines',
+                      'Makati, Philippines',
+                      'Quezon City, Philippines',
+                      'Pasig, Philippines',
+                      'Baguio, Philippines',
+                      'Cebu, Philippines',
+                      'Davao, Philippines',
+                      'Iloilo, Philippines',
+                    ];
+                    const randomDestination = destinations[Math.floor(Math.random() * destinations.length)];
+                    
+                    // Random purpose variations
+                    const purposes = [
+                      'Business travel',
+                      'Official business',
+                      'Work-related travel',
+                      'Academic conference',
+                      'Training session',
+                      'Coordination meeting',
+                      'Field research',
+                      'Site visit',
+                    ];
+                    const randomPurpose = purposes[Math.floor(Math.random() * purposes.length)];
+                    
+                    // Add random milliseconds to make each submission unique
+                    const randomSuffix = Math.floor(Math.random() * 1000);
                     
                     handleTravelOrderChange({
                       date: today.toISOString().split('T')[0],
                       requestingPerson: profile.name || '',
                       department: profile.department ? `${profile.department.name}${profile.department.code ? ` (${profile.department.code})` : ''}` : '',
-                      destination: 'Manila, Philippines',
-                      departureDate: tomorrow.toISOString().split('T')[0],
-                      returnDate: dayAfter.toISOString().split('T')[0],
-                      purposeOfTravel: 'Business travel',
+                      destination: randomDestination,
+                      departureDate: departureDate.toISOString().split('T')[0],
+                      returnDate: returnDate.toISOString().split('T')[0],
+                      purposeOfTravel: `${randomPurpose} ${randomSuffix > 500 ? '(Ref: ' + randomSuffix + ')' : ''}`.trim(),
                       requesterContactNumber: profile.phone_number || '',
                     });
-                    Alert.alert('Form Filled', 'All required fields have been filled with sample data. Please review and adjust as needed.');
+                    Alert.alert('Form Filled', 'All required fields have been filled with randomized sample data. Please review and adjust as needed.');
                   }
                 }}
               >
@@ -1426,6 +1692,8 @@ export default function TravelOrderScreen() {
                     onSave={(dataUrl) => handleTravelOrderChange({ endorsedByHeadSignature: dataUrl || '' })}
                     onClear={() => handleTravelOrderChange({ endorsedByHeadSignature: '' })}
                     hideSaveButton
+                    onDrawingStart={() => setScrollEnabled(false)}
+                    onDrawingEnd={() => setScrollEnabled(true)}
                   />
                 </View>
               </View>
@@ -1780,9 +2048,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef2f2',
   },
   signatureHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
@@ -1802,6 +2070,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fee2e2',
     borderWidth: 2,
     borderColor: '#fecaca',
+    alignSelf: 'flex-start',
+    marginTop: 4,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1813,20 +2083,23 @@ const styles = StyleSheet.create({
   },
   endorsementSection: {
     marginTop: 24,
-    padding: 16,
+    padding: 20,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
   },
   endorsementHeader: {
-    marginBottom: 16,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 20,
     paddingBottom: 16,
     borderBottomWidth: 2,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#d1d5db',
   },
   endorsementTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 8,
@@ -1858,19 +2131,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   endorsementLabel: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#374151',
+    color: '#111827',
+    marginBottom: 6,
   },
   endorsementInput: {
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: '#d1d5db',
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
     color: '#111827',
     backgroundColor: '#fff',
-    height: 44,
+    height: 50,
+    minHeight: 50,
   },
   endorsementInputDisabled: {
     backgroundColor: '#f3f4f6',

@@ -31,6 +31,7 @@ export default function BudgetReviewScreen() {
   const [historyRequests, setHistoryRequests] = useState<Request[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const historyFetchedRef = React.useRef(false);
 
   const { requests, isLoading, error, refetch } = useComptrollerInbox(profile?.id || '');
 
@@ -60,17 +61,21 @@ export default function BudgetReviewScreen() {
       if (historyError) {
         // Don't log abort errors - they're expected when component unmounts
         if (historyError.message?.includes('Aborted') || historyError.message?.includes('abort') || historyError.name === 'AbortError') {
+          setLoadingHistory(false);
           return;
         }
         console.warn('Error fetching history:', historyError);
+        setLoadingHistory(false);
         return;
       }
 
       setHistoryRequests((data || []) as Request[]);
+      historyFetchedRef.current = true;
     } catch (err: any) {
       clearTimeout(timeoutId);
       // Handle abort errors gracefully - don't log them as errors
       if (err?.message?.includes('Aborted') || err?.message?.includes('abort') || err?.name === 'AbortError') {
+        setLoadingHistory(false);
         return;
       }
       console.warn('Error fetching history:', err);
@@ -81,19 +86,14 @@ export default function BudgetReviewScreen() {
 
   // Load history when filter changes to history
   React.useEffect(() => {
-    let isMounted = true;
-    
-    if (filter === 'history' && historyRequests.length === 0) {
-      fetchHistory().then(() => {
-        if (!isMounted) return;
-      }).catch(() => {
-        // Errors already handled in fetchHistory
-      });
+    if (filter === 'history' && !historyFetchedRef.current && !loadingHistory) {
+      fetchHistory();
     }
     
-    return () => {
-      isMounted = false;
-    };
+    // Reset fetch flag when switching away from history
+    if (filter !== 'history') {
+      historyFetchedRef.current = false;
+    }
   }, [filter]);
 
   // Filter and search requests

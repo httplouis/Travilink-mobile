@@ -11,21 +11,46 @@ export function useNotifications(userId: string) {
     queryFn: async () => {
       // Don't query if userId is empty or invalid
       if (!userId || userId.trim() === '') {
+        console.warn('[useNotifications] Empty userId, returning empty array');
         return [];
       }
 
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      try {
+        console.log('[useNotifications] Fetching notifications for userId:', userId);
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(100); // Increased limit to get more notifications
 
-      if (error) throw error;
-      return data as Notification[];
+        if (error) {
+          // Log error details for debugging
+          console.error('[useNotifications] Query error:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            userId,
+          });
+          // Return empty array on error instead of throwing
+          return [];
+        }
+        
+        console.log(`[useNotifications] Fetched ${data?.length || 0} notifications for userId: ${userId}`);
+        return (data || []) as Notification[];
+      } catch (err: any) {
+        // Silently log - don't show to user
+        console.warn('[useNotifications] Exception (non-critical):', {
+          message: err?.message?.substring(0, 100),
+        });
+        return [];
+      }
     },
     enabled: !!userId && userId.trim() !== '', // Only run query if userId is valid
     refetchInterval: 5000, // Auto-refresh every 5 seconds
+    retry: 2, // Retry failed queries
+    retryDelay: 1000, // Wait 1 second between retries
   });
 
   // Set up real-time subscription

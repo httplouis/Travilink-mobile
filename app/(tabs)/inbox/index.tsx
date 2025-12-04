@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   TextInput,
   ScrollView,
   Animated,
+  Platform,
 } from 'react-native';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,11 +29,12 @@ import InboxRequestCard from '@/components/InboxRequestCard';
 import { RequestCardSkeleton } from '@/components/LoadingSkeleton';
 import { formatDate } from '@/lib/utils';
 
+
 export default function InboxScreen() {
   const { profile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'urgent' | 'high_budget'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'urgent' | 'overdue' | 'today' | 'high_budget'>('all');
 
   // Debug logging
   React.useEffect(() => {
@@ -169,6 +171,25 @@ export default function InboxScreen() {
         const diffDays = Math.ceil((travelDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         return diffDays <= 3 && diffDays >= 0;
       });
+    } else if (filterStatus === 'overdue') {
+      filtered = filtered.filter((req) => {
+        if (!req.travel_start_date) return false;
+        const travelDate = new Date(req.travel_start_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        travelDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((travelDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return diffDays < 0;
+      });
+    } else if (filterStatus === 'today') {
+      filtered = filtered.filter((req) => {
+        if (!req.travel_start_date) return false;
+        const travelDate = new Date(req.travel_start_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        travelDate.setHours(0, 0, 0, 0);
+        return travelDate.getTime() === today.getTime();
+      });
     } else if (filterStatus === 'high_budget') {
       filtered = filtered.filter((req) => (req.total_budget || 0) >= 15000);
     }
@@ -186,7 +207,9 @@ export default function InboxScreen() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <NavigationHeader title={getRoleTitle()} />
+      <View style={styles.headerContainer}>
+        <NavigationHeader title={getRoleTitle()} />
+      </View>
       
       {/* Search and Filter Bar */}
       {requests.length > 0 && (
@@ -236,6 +259,39 @@ export default function InboxScreen() {
               }).length}
               color="#f59e0b"
             />
+            {profile?.is_head && (
+              <>
+                <FilterChip
+                  label="Overdue"
+                  active={filterStatus === 'overdue'}
+                  onPress={() => setFilterStatus('overdue')}
+                  count={requests.filter((req) => {
+                    if (!req.travel_start_date) return false;
+                    const travelDate = new Date(req.travel_start_date);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    travelDate.setHours(0, 0, 0, 0);
+                    const diffDays = Math.ceil((travelDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    return diffDays < 0;
+                  }).length}
+                  color="#dc2626"
+                />
+                <FilterChip
+                  label="Today"
+                  active={filterStatus === 'today'}
+                  onPress={() => setFilterStatus('today')}
+                  count={requests.filter((req) => {
+                    if (!req.travel_start_date) return false;
+                    const travelDate = new Date(req.travel_start_date);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    travelDate.setHours(0, 0, 0, 0);
+                    return travelDate.getTime() === today.getTime();
+                  }).length}
+                  color="#10b981"
+                />
+              </>
+            )}
             <FilterChip
               label="High Budget"
               active={filterStatus === 'high_budget'}
@@ -300,25 +356,27 @@ export default function InboxScreen() {
           <FlatList
             data={filteredRequests}
             keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
-              <Animated.View
-                style={{
-                  opacity: 1,
-                  transform: [{ translateY: 0 }],
-                }}
-              >
-                <InboxRequestCard
-                  request={item}
-                  role={
-                    isComptrollerUser ? 'comptroller' :
-                    profile.is_head ? 'head' : 
-                    profile.is_vp ? 'vp' : 
-                    profile.is_president ? 'president' : 
-                    'hr'
-                  }
-                />
-              </Animated.View>
-            )}
+            renderItem={({ item, index }) => {
+              return (
+                <Animated.View
+                  style={{
+                    opacity: 1,
+                    transform: [{ translateY: 0 }],
+                  }}
+                >
+                  <InboxRequestCard
+                    request={item}
+                    role={
+                      isComptrollerUser ? 'comptroller' :
+                      profile.is_head ? 'head' : 
+                      profile.is_vp ? 'vp' : 
+                      profile.is_president ? 'president' : 
+                      'hr'
+                    }
+                  />
+                </Animated.View>
+              );
+            }}
             contentContainerStyle={styles.listContent}
             refreshControl={
               <RefreshControl 
@@ -342,10 +400,14 @@ export default function InboxScreen() {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
+  },
+  headerContainer: {
+    position: 'relative',
   },
   centerContainer: {
     flex: 1,

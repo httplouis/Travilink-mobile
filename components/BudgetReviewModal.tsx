@@ -669,6 +669,164 @@ export default function BudgetReviewModal({
               </View>
             </View>
 
+            {/* PRIORITY 2.5: PAST SIGNATURES */}
+            {(request.requester_signature || request.head_signature || request.parent_head_signature || 
+              request.admin_signature || request.hr_signature || request.vp_signature || 
+              request.president_signature || request.exec_signature || request.comptroller_signature) && (
+              <View style={styles.signaturesSection}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="create-outline" size={18} color="#7a0019" />
+                  <Text style={styles.sectionTitle}>Signatures</Text>
+                </View>
+                
+                <View style={styles.signaturesCard}>
+                  {request.requester_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>Requester</Text>
+                      <Image 
+                        source={{ uri: request.requester_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.requester_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.requester_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.head_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>Department Head</Text>
+                      <Image 
+                        source={{ uri: request.head_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.head_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.head_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.parent_head_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>Parent Head</Text>
+                      <Image 
+                        source={{ uri: request.parent_head_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.parent_head_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.parent_head_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.admin_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>Administrator</Text>
+                      <Image 
+                        source={{ uri: request.admin_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.admin_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.admin_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.comptroller_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>Comptroller</Text>
+                      <Image 
+                        source={{ uri: request.comptroller_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.comptroller_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.comptroller_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.hr_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>HR</Text>
+                      <Image 
+                        source={{ uri: request.hr_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.hr_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.hr_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.vp_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>VP</Text>
+                      <Image 
+                        source={{ uri: request.vp_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.vp_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.vp_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.president_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>President</Text>
+                      <Image 
+                        source={{ uri: request.president_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.president_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.president_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {request.exec_signature && (
+                    <View style={styles.signatureItem}>
+                      <Text style={styles.signatureLabel}>Executive</Text>
+                      <Image 
+                        source={{ uri: request.exec_signature }} 
+                        style={styles.signatureImage} 
+                        resizeMode="contain"
+                      />
+                      {request.exec_signed_at && (
+                        <Text style={styles.signatureDate}>
+                          {formatDateTime(request.exec_signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* PRIORITY 3: COMPTROLLER ACTIONS */}
             {!isHistory && (
               <View style={styles.actionsSection}>
@@ -1344,11 +1502,14 @@ const styles = StyleSheet.create({
   // Signatures Section
   signaturesSection: {
     marginBottom: 20,
-    padding: 16,
-    backgroundColor: '#f9fafb',
+  },
+  signaturesCard: {
+    backgroundColor: '#fff',
     borderRadius: 10,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    gap: 12,
   },
   signaturesHeader: {
     flexDirection: 'row',
@@ -1392,6 +1553,18 @@ const styles = StyleSheet.create({
   signatureItemDate: {
     fontSize: 11,
     color: '#9ca3af',
+  },
+  signatureLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  signatureDate: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 4,
+    textAlign: 'center',
   },
   
   // Signature in approval section (combined)

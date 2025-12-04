@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '@/lib/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { notifyRequester, notifyNextApprover } from '@/lib/notifications';
 
 interface UpdateBudgetParams {
   requestId: string;
@@ -195,10 +196,77 @@ export function useComptrollerBudgetReview() {
 
       if (updateError) throw updateError;
 
+      // Get request info and approver name for notifications
+      const { data: requestInfo } = await supabase
+        .from('requests')
+        .select('requester_id, request_number, requester_name')
+        .eq('id', requestId)
+        .single();
+
+      const { data: approverProfile } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', profile.id)
+        .single();
+      
+      const approverName = approverProfile?.name || 'Comptroller';
+
+      // Create notifications
+      try {
+        // Notify requester that comptroller approved
+        if (requestInfo?.requester_id) {
+          await notifyRequester(
+            requestInfo.requester_id,
+            requestId,
+            requestInfo.request_number || 'DRAFT',
+            'approved',
+            approverName,
+            'comptroller'
+          ).catch(err => {
+            console.error('[useComptrollerBudgetReview] Failed to notify requester:', err);
+          });
+          console.log(`[useComptrollerBudgetReview] Notified requester ${requestInfo.requester_id} of comptroller approval`);
+        }
+
+        // Notify HR (next approver)
+        const { data: hrUsers, error: hrError } = await supabase
+          .from('users')
+          .select('id, name')
+          .eq('is_hr', true)
+          .eq('is_active', true);
+        
+        if (hrError) {
+          console.error('[useComptrollerBudgetReview] Error fetching HR users:', hrError);
+        } else if (hrUsers && hrUsers.length > 0) {
+          // Notify all HR users
+          const hrNotificationPromises = hrUsers.map(hr =>
+            notifyNextApprover(
+              hr.id,
+              requestId,
+              requestInfo?.request_number || 'DRAFT',
+              requestInfo?.requester_name || 'Requester',
+              'hr'
+            ).catch(err => {
+              console.error(`[useComptrollerBudgetReview] Failed to notify HR ${hr.id}:`, err);
+              return null;
+            })
+          );
+          
+          await Promise.all(hrNotificationPromises);
+          console.log(`[useComptrollerBudgetReview] Notified ${hrUsers.length} HR user(s) for request ${requestInfo?.request_number}`);
+        } else {
+          console.warn('[useComptrollerBudgetReview] No active HR users found to notify');
+        }
+      } catch (notifError) {
+        console.error('[useComptrollerBudgetReview] Error creating notifications:', notifError);
+      }
+
       // Invalidate queries to refresh
       await queryClient.invalidateQueries({ queryKey: ['comptroller-inbox'] });
       await queryClient.invalidateQueries({ queryKey: ['hr-inbox'] });
       await queryClient.invalidateQueries({ queryKey: ['request-tracking'] });
+      // Invalidate notifications for all users - use prefix matching to catch all user-specific queries
+      await queryClient.invalidateQueries({ queryKey: ['notifications'], exact: false });
       // Force refetch HR inbox immediately
       await queryClient.refetchQueries({ queryKey: ['hr-inbox'] });
 
@@ -248,17 +316,46 @@ export function useComptrollerBudgetReview() {
           comptroller_comments: reason,
           comptroller_signature: signature || null,
           comptroller_signed_at: signature ? new Date().toISOString() : null,
-          returned_to_requester_at: now,
-          returned_by: profile.id,
-          return_reason: reason,
         })
         .eq('id', requestId);
 
       if (updateError) throw updateError;
 
+      // Get request info and approver name for notifications
+      const { data: requestInfo } = await supabase
+        .from('requests')
+        .select('requester_id, request_number, requester_name')
+        .eq('id', requestId)
+        .single();
+
+      const { data: approverProfile } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', profile.id)
+        .single();
+      
+      const approverName = approverProfile?.name || 'Comptroller';
+
+      // Notify requester
+      try {
+        if (requestInfo?.requester_id) {
+          await notifyRequester(
+            requestInfo.requester_id,
+            requestId,
+            requestInfo.request_number || 'DRAFT',
+            'returned',
+            approverName,
+            'comptroller'
+          );
+        }
+      } catch (notifError) {
+        console.error('Error creating notification:', notifError);
+      }
+
       // Invalidate queries to refresh
       queryClient.invalidateQueries({ queryKey: ['comptroller-inbox'] });
       queryClient.invalidateQueries({ queryKey: ['request-tracking'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
       return { success: true };
     } catch (err: any) {

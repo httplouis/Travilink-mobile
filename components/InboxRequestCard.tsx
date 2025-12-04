@@ -19,11 +19,8 @@ interface InboxRequestCardProps {
 
 export default function InboxRequestCard({ request, role, onPress }: InboxRequestCardProps) {
   const handleViewDetails = () => {
-    if (onPress) {
-      onPress();
-    } else {
-      router.push(`/request/${request.id}`);
-    }
+    // Always navigate to read-only details page
+    router.push(`/request/${request.id}`);
   };
 
   // Calculate days until travel
@@ -156,6 +153,16 @@ export default function InboxRequestCard({ request, role, onPress }: InboxReques
                 </View>
               </View>
             )}
+
+            {/* Submission/Inbox Time - Show for comptroller role */}
+            {role === 'comptroller' && request.created_at && (
+              <View style={styles.submissionTimeRow}>
+                <Ionicons name="time-outline" size={12} color="#9ca3af" />
+                <Text style={styles.submissionTimeText}>
+                  Submitted {formatDate(request.created_at)} at {new Date(request.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.actionsContainer}>
@@ -227,8 +234,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 14,
-    paddingBottom: 10,
+    padding: 12,
+    paddingBottom: 8,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -238,17 +245,17 @@ const styles = StyleSheet.create({
   },
   statusIndicator: {
     width: 3,
-    height: 36,
+    height: 32,
     borderRadius: 2,
   },
   headerTextContainer: {
     flex: 1,
   },
   requestNumber: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 3,
     letterSpacing: 0.5,
   },
   badgeRow: {
@@ -299,28 +306,28 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   cardContent: {
-    padding: 16,
+    padding: 12,
     paddingTop: 0,
   },
   requesterSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-    paddingBottom: 16,
+    gap: 10,
+    marginBottom: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
   requesterAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#7a0019',
     justifyContent: 'center',
     alignItems: 'center',
   },
   requesterAvatarText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#fff',
   },
@@ -328,11 +335,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   requesterName: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 6,
-    lineHeight: 22,
+    marginBottom: 4,
+    lineHeight: 20,
   },
   departmentRow: {
     flexDirection: 'row',
@@ -340,32 +347,32 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   department: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
     fontWeight: '500',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   destinationSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    marginBottom: 16,
-    padding: 12,
+    marginBottom: 12,
+    padding: 10,
     backgroundColor: '#f9fafb',
     borderRadius: 8,
   },
   destination: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#111827',
-    lineHeight: 22,
+    lineHeight: 20,
   },
   datesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
     flexWrap: 'wrap',
   },
   dateItem: {
@@ -374,10 +381,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dateText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#374151',
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   daysBadge: {
     paddingHorizontal: 10,
@@ -408,10 +415,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
+    padding: 10,
     backgroundColor: '#f9fafb',
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   budgetLabelContainer: {
     flexDirection: 'row',
@@ -419,10 +426,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   budgetLabel: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#6b7280',
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   budgetAmountContainer: {
     flexDirection: 'row',
@@ -430,7 +437,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   budgetAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: '#7a0019',
     letterSpacing: 0.5,
@@ -454,8 +461,8 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     gap: 8,
-    padding: 16,
-    paddingTop: 12,
+    padding: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
     backgroundColor: '#fafafa',
@@ -465,16 +472,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    minHeight: 48, // Accessibility: minimum touch target
-    borderRadius: 12,
+    gap: 6,
+    paddingVertical: 12,
+    minHeight: 44, // Accessibility: minimum touch target
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#7a0019',
     backgroundColor: '#fff',
   },
   viewButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#7a0019',
     letterSpacing: 0.2,
@@ -484,10 +491,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    minHeight: 48, // Accessibility: minimum touch target
-    borderRadius: 12,
+    gap: 6,
+    paddingVertical: 12,
+    minHeight: 44, // Accessibility: minimum touch target
+    borderRadius: 10,
     backgroundColor: '#7a0019',
     shadowColor: '#7a0019',
     shadowOffset: { width: 0, height: 4 },
@@ -496,10 +503,23 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   approveButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#fff',
     letterSpacing: 0.2,
+  },
+  submissionTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  submissionTimeText: {
+    fontSize: 11,
+    color: '#9ca3af',
+    fontWeight: '500',
   },
 });
 
