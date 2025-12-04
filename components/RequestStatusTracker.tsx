@@ -98,11 +98,9 @@ export default function RequestStatusTracker({
     return { ...stage, skipInfo };
   });
 
-  // Show all stages - include everything so users see the complete workflow
-  const activeStages = allStages.filter(stage => {
-    // Always show all stages so users can see the complete approval flow
-    return true;
-  });
+  // ALWAYS show all 7 stages - never filter any out, just mark skipped ones
+  // This ensures users always see the complete workflow
+  const activeStages = allStages; // Use all stages directly, no filtering
 
   const getStageStatus = (stageKey: string): 'completed' | 'current' | 'pending' | 'rejected' => {
     if (status === 'rejected' && rejectionStage === stageKey) return 'rejected';
@@ -184,12 +182,13 @@ export default function RequestStatusTracker({
 
 
   if (compact) {
-    // Calculate progress
+    // Calculate progress - always use ALL 7 stages for total count
     const completedCount = activeStages.filter(stage => {
       const stageStatus = getStageStatus(stage.key);
       return stageStatus === 'completed';
     }).length;
-    const totalCount = activeStages.length;
+    // ALWAYS show 7 stages total - this is the complete workflow
+    const totalCount = STAGES.length; // Always 7 stages
     const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
     
     return (
