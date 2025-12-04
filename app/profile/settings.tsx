@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -171,6 +172,11 @@ export default function SettingsScreen() {
 
       {/* Version */}
       <View style={styles.versionContainer}>
+        <Image
+          source={require('@/assets/travelink.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Text style={styles.versionText}>TraviLink Mobile v1.0.0</Text>
       </View>
       
@@ -246,6 +252,11 @@ const styles = StyleSheet.create({
   versionContainer: {
     alignItems: 'center',
     padding: 24,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
   },
   versionText: {
     fontSize: 12,

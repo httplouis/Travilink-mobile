@@ -11,6 +11,7 @@ import {
   ScrollView,
   Linking as RNLinking,
   Alert,
+  Image,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusBar } from 'expo-status-bar';
@@ -305,7 +306,11 @@ export default function SignInScreen() {
           {/* Logo/Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>TL</Text>
+              <Image
+                source={require('@/assets/travelink.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.title}>TraveLink</Text>
             <Text style={styles.subtitle}>Smart Campus Transport System</Text>
@@ -419,18 +424,18 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoContainer: {
-    width: 80,
-    height: 80,
+    width: 100,
+    height: 100,
     borderRadius: 20,
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    padding: 8,
   },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#7a0019',
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 32,

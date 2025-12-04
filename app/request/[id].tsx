@@ -147,7 +147,9 @@ export default function RequestDetailsScreen() {
                 </View>
               )}
             </View>
-            <StatusBadge status={request.status} size="md" />
+            <View style={styles.statusBadgeContainer}>
+              <StatusBadge status={request.status} size="md" />
+            </View>
           </View>
           <Text style={styles.requestTitle}>{request.title || request.purpose}</Text>
           <View style={styles.headerCardDetails}>
@@ -737,12 +739,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 12,
     flexWrap: 'wrap',
+    width: '100%',
   },
   requestNumberContainer: {
     flex: 1,
     gap: 8,
     minWidth: 0, // Allow text to wrap
     flexShrink: 1,
+    maxWidth: '100%',
   },
   requestNumber: {
     fontSize: 20,
@@ -766,6 +770,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#7a0019',
+  },
+  statusBadgeContainer: {
+    flexShrink: 0,
+    alignItems: 'flex-end',
   },
   actionButtonsContainer: {
     marginTop: 16,
