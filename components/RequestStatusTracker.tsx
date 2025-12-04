@@ -184,46 +184,101 @@ export default function RequestStatusTracker({
 
 
   if (compact) {
+    // Calculate progress
+    const completedCount = activeStages.filter(stage => {
+      const stageStatus = getStageStatus(stage.key);
+      return stageStatus === 'completed';
+    }).length;
+    const totalCount = activeStages.length;
+    const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    
     return (
-      <View style={styles.compactContainer}>
-        {activeStages.map((stage, idx) => {
-          const stageStatus = getStageStatus(stage.key);
-          const isLast = idx === activeStages.length - 1;
-          
-          return (
-            <React.Fragment key={stage.key}>
-              <View
-                style={[
-                  styles.compactIcon,
-                  stageStatus === 'completed' && styles.compactIconCompleted,
-                  stageStatus === 'current' && styles.compactIconCurrent,
-                  stageStatus === 'rejected' && styles.compactIconRejected,
-                ]}
-              >
-                {stageStatus === 'completed' && (
-                  <Ionicons name="checkmark" size={12} color="#fff" />
-                )}
-                {stageStatus === 'current' && (
-                  <Ionicons name="time" size={12} color="#fff" />
-                )}
-                {stageStatus === 'rejected' && (
-                  <Ionicons name="close" size={12} color="#fff" />
-                )}
-                {stageStatus === 'pending' && (
-                  <Ionicons name={stage.icon} size={12} color="#999" />
-                )}
-              </View>
-              {!isLast && (
+      <View style={styles.compactWrapper}>
+        <View style={styles.compactHeader}>
+          <Text style={styles.compactProgressText}>
+            {completedCount} of {totalCount} steps completed
+          </Text>
+          <View style={styles.compactProgressBar}>
+            <View 
+              style={[
+                styles.compactProgressFill,
+                { width: `${progressPercent}%` }
+              ]} 
+            />
+          </View>
+        </View>
+        <View style={styles.compactContainer}>
+          {activeStages.map((stage, idx) => {
+            const stageStatus = getStageStatus(stage.key);
+            const isLast = idx === activeStages.length - 1;
+            const skipInfo = (stage as any).skipInfo || { skipped: false };
+            const isSkipped = skipInfo.skipped && stageStatus === 'pending';
+            
+            return (
+              <React.Fragment key={stage.key}>
                 <View
                   style={[
-                    styles.compactConnector,
-                    stageStatus === 'completed' && styles.compactConnectorCompleted,
+                    styles.compactIcon,
+                    stageStatus === 'completed' && styles.compactIconCompleted,
+                    stageStatus === 'current' && styles.compactIconCurrent,
+                    stageStatus === 'rejected' && styles.compactIconRejected,
+                    isSkipped && styles.compactIconSkipped,
                   ]}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
+                >
+                  {stageStatus === 'completed' && (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  )}
+                  {stageStatus === 'current' && (
+                    <Ionicons name="time" size={14} color="#fff" />
+                  )}
+                  {stageStatus === 'rejected' && (
+                    <Ionicons name="close" size={14} color="#fff" />
+                  )}
+                  {isSkipped && (
+                    <Ionicons name="remove" size={14} color="#9ca3af" />
+                  )}
+                  {stageStatus === 'pending' && !isSkipped && (
+                    <Ionicons name={stage.icon} size={14} color="#9ca3af" />
+                  )}
+                </View>
+                {!isLast && (
+                  <View
+                    style={[
+                      styles.compactConnector,
+                      stageStatus === 'completed' && styles.compactConnectorCompleted,
+                      isSkipped && styles.compactConnectorSkipped,
+                    ]}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </View>
+        <View style={styles.compactLabels}>
+          {activeStages.map((stage, idx) => {
+            const stageStatus = getStageStatus(stage.key);
+            const skipInfo = (stage as any).skipInfo || { skipped: false };
+            const isSkipped = skipInfo.skipped && stageStatus === 'pending';
+            const isLast = idx === activeStages.length - 1;
+            
+            return (
+              <React.Fragment key={stage.key}>
+                <Text 
+                  style={[
+                    styles.compactLabel,
+                    stageStatus === 'current' && styles.compactLabelCurrent,
+                    stageStatus === 'completed' && styles.compactLabelCompleted,
+                    isSkipped && styles.compactLabelSkipped,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {stage.role}
+                </Text>
+                {!isLast && <View style={styles.compactLabelSpacer} />}
+              </React.Fragment>
+            );
+          })}
+        </View>
       </View>
     );
   }
@@ -373,41 +428,125 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
   },
+  compactWrapper: {
+    paddingVertical: 4,
+  },
+  compactHeader: {
+    marginBottom: 10,
+  },
+  compactProgressText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  compactProgressBar: {
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  compactProgressFill: {
+    height: '100%',
+    backgroundColor: '#16a34a',
+    borderRadius: 2,
+  },
   compactContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    gap: 2,
+    justifyContent: 'center',
+    paddingVertical: 4,
+    gap: 0,
     flexWrap: 'wrap',
   },
   compactIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#e5e7eb',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 1,
-    flexShrink: 0,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   compactIconCompleted: {
     backgroundColor: '#16a34a',
+    borderColor: '#16a34a',
+    shadowColor: '#16a34a',
+    shadowOpacity: 0.3,
   },
   compactIconCurrent: {
     backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+    shadowColor: '#2563eb',
+    shadowOpacity: 0.3,
   },
   compactIconRejected: {
     backgroundColor: '#dc2626',
+    borderColor: '#dc2626',
+    shadowColor: '#dc2626',
+    shadowOpacity: 0.3,
+  },
+  compactIconSkipped: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#d1d5db',
+    borderStyle: 'dashed',
   },
   compactConnector: {
-    width: 20,
-    height: 2,
+    width: 24,
+    height: 3,
     backgroundColor: '#e5e7eb',
-    marginHorizontal: 1,
+    marginHorizontal: 2,
     flexShrink: 0,
+    borderRadius: 1.5,
   },
   compactConnectorCompleted: {
     backgroundColor: '#16a34a',
+  },
+  compactConnectorActive: {
+    backgroundColor: '#16a34a',
+  },
+  compactConnectorSkipped: {
+    backgroundColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  compactLabels: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 0,
+  },
+  compactLabel: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: '#9ca3af',
+    textAlign: 'center',
+    width: 32,
+    marginTop: 4,
+    lineHeight: 12,
+  },
+  compactLabelSpacer: {
+    width: 28,
+  },
+  compactLabelCurrent: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  compactLabelCompleted: {
+    color: '#16a34a',
+    fontWeight: '600',
+  },
+  compactLabelSkipped: {
+    color: '#d1d5db',
+    textDecorationLine: 'line-through',
   },
   rejectedBanner: {
     flexDirection: 'row',
