@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "scheme": "travilink",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/travelink.png",
       "resizeMode": "contain",
       "backgroundColor": "#7a0019"
     },
@@ -19,7 +19,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/travelink.png",
         "backgroundColor": "#7a0019"
       },
       "edgeToEdgeEnabled": true,
@@ -27,7 +27,7 @@
       "package": "com.travilink.mobile"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/travelink.png"
     },
     "extra": {
       "eas": {
