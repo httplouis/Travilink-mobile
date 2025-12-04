@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RequestStatus } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
@@ -98,14 +98,9 @@ export default function RequestStatusTracker({
     return { ...stage, skipInfo };
   });
 
-  // Show all stages, but filter out skipped ones in compact view for cleaner UI
+  // Show all stages - include everything so users see the complete workflow
   const activeStages = allStages.filter(stage => {
-    if (compact) {
-      // In compact view, hide skipped stages to keep everything in one clean line
-      const skipInfo = (stage as any).skipInfo || { skipped: false };
-      return !skipInfo.skipped;
-    }
-    // In full view, show all stages
+    // Always show all stages so users can see the complete approval flow
     return true;
   });
 
@@ -212,16 +207,17 @@ export default function RequestStatusTracker({
             />
           </View>
         </View>
-        <View style={styles.compactContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.compactContainer}
+          style={styles.compactContainerScroll}
+        >
           {activeStages.map((stage, idx) => {
             const stageStatus = getStageStatus(stage.key);
             const isLast = idx === activeStages.length - 1;
-            // Skip rendering skipped stages in compact view
             const skipInfo = (stage as any).skipInfo || { skipped: false };
-            if (skipInfo.skipped && stageStatus === 'pending') {
-              return null;
-            }
-            const isSkipped = false; // Never show skipped in compact view
+            const isSkipped = skipInfo.skipped && stageStatus === 'pending';
             
             return (
               <React.Fragment key={stage.key}>
@@ -262,7 +258,7 @@ export default function RequestStatusTracker({
               </React.Fragment>
             );
           })}
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -437,13 +433,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
     borderRadius: 2,
   },
+  compactContainerScroll: {
+    flexGrow: 0,
+  },
   compactContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingVertical: 4,
+    paddingHorizontal: 4,
     gap: 0,
-    flexWrap: 'nowrap',
+    minWidth: '100%',
   },
   compactIcon: {
     width: 32,
