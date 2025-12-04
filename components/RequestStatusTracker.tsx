@@ -254,31 +254,6 @@ export default function RequestStatusTracker({
             );
           })}
         </View>
-        <View style={styles.compactLabels}>
-          {activeStages.map((stage, idx) => {
-            const stageStatus = getStageStatus(stage.key);
-            const skipInfo = (stage as any).skipInfo || { skipped: false };
-            const isSkipped = skipInfo.skipped && stageStatus === 'pending';
-            const isLast = idx === activeStages.length - 1;
-            
-            return (
-              <React.Fragment key={stage.key}>
-                <Text 
-                  style={[
-                    styles.compactLabel,
-                    stageStatus === 'current' && styles.compactLabelCurrent,
-                    stageStatus === 'completed' && styles.compactLabelCompleted,
-                    isSkipped && styles.compactLabelSkipped,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {stage.role}
-                </Text>
-                {!isLast && <View style={styles.compactLabelSpacer} />}
-              </React.Fragment>
-            );
-          })}
-        </View>
       </View>
     );
   }
@@ -516,37 +491,6 @@ const styles = StyleSheet.create({
   compactConnectorSkipped: {
     backgroundColor: '#e5e7eb',
     borderStyle: 'dashed',
-  },
-  compactLabels: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    marginTop: 8,
-    paddingHorizontal: 0,
-  },
-  compactLabel: {
-    fontSize: 9,
-    fontWeight: '500',
-    color: '#9ca3af',
-    textAlign: 'center',
-    width: 32,
-    marginTop: 4,
-    lineHeight: 12,
-  },
-  compactLabelSpacer: {
-    width: 28,
-  },
-  compactLabelCurrent: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  compactLabelCompleted: {
-    color: '#16a34a',
-    fontWeight: '600',
-  },
-  compactLabelSkipped: {
-    color: '#d1d5db',
-    textDecorationLine: 'line-through',
   },
   rejectedBanner: {
     flexDirection: 'row',
