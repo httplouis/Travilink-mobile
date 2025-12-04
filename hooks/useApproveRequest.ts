@@ -152,18 +152,20 @@ export function useApproveRequest() {
             nextStatus = 'pending_hr';
           }
         } else if (role === 'vp' && currentRequest.status === 'pending_vp') {
-          // Updated threshold: Faculty with budget > 15k OR heads always go to President
+          // President approval logic:
+          // - Heads always go to President
+          // - Faculty: only if budget >= 15,000 (else only until VP)
           const isFaculty = !currentRequest.requester_is_head;
           const budget = currentRequest.total_budget || 0;
           
           if (currentRequest.requester_is_head) {
             // Heads always go to President
             nextStatus = 'pending_president';
-          } else if (isFaculty && budget > 15000) {
-            // Faculty with budget > 15k go to President
+          } else if (isFaculty && budget >= 15000) {
+            // Faculty with budget >= 15k go to President
             nextStatus = 'pending_president';
           } else {
-            // Faculty with budget <= 15k: VP approval is sufficient
+            // Faculty with budget < 15k: VP approval is sufficient (President skipped)
             nextStatus = 'approved';
           }
         } else if (role === 'president' && currentRequest.status === 'pending_president') {
