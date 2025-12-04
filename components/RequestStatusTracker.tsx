@@ -98,9 +98,14 @@ export default function RequestStatusTracker({
     return { ...stage, skipInfo };
   });
 
-  // Show all stages, but mark skipped ones
+  // Show all stages, but filter out skipped ones in compact view for cleaner UI
   const activeStages = allStages.filter(stage => {
-    // Always show all stages, even if skipped, so users can see the full workflow
+    if (compact) {
+      // In compact view, hide skipped stages to keep everything in one clean line
+      const skipInfo = (stage as any).skipInfo || { skipped: false };
+      return !skipInfo.skipped;
+    }
+    // In full view, show all stages
     return true;
   });
 
@@ -196,7 +201,7 @@ export default function RequestStatusTracker({
       <View style={styles.compactWrapper}>
         <View style={styles.compactHeader}>
           <Text style={styles.compactProgressText}>
-            {completedCount} of {totalCount} steps completed
+            {completedCount} of {totalCount} signatures completed
           </Text>
           <View style={styles.compactProgressBar}>
             <View 
@@ -211,8 +216,12 @@ export default function RequestStatusTracker({
           {activeStages.map((stage, idx) => {
             const stageStatus = getStageStatus(stage.key);
             const isLast = idx === activeStages.length - 1;
+            // Skip rendering skipped stages in compact view
             const skipInfo = (stage as any).skipInfo || { skipped: false };
-            const isSkipped = skipInfo.skipped && stageStatus === 'pending';
+            if (skipInfo.skipped && stageStatus === 'pending') {
+              return null;
+            }
+            const isSkipped = false; // Never show skipped in compact view
             
             return (
               <React.Fragment key={stage.key}>
@@ -434,7 +443,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 4,
     gap: 0,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   compactIcon: {
     width: 32,
