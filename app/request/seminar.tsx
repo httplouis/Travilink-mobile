@@ -382,16 +382,95 @@ export default function SeminarScreen() {
         },
       };
 
-      // Insert request
-      const { data: request, error } = await supabase
-        .from('requests')
-        .insert(requestData)
-        .select()
-        .single();
+      // Insert request - EXPLICITLY set request_number to NULL so the database trigger generates it
+      // The trigger checks "IF NEW.request_number IS NULL" so we MUST set it to null explicitly
+      const insertData: any = {
+        ...requestData,
+        request_number: null, // EXPLICITLY set to null to trigger database generation
+      };
+      
+      console.log('[Seminar] Inserting request with request_number explicitly set to NULL for database trigger');
+      
+      const maxRetries = 8; // Increased retries
+      let request: any = null;
+      let insertError: any = null;
 
-      if (error) {
-        console.error('Seminar submission error:', error);
-        throw error;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // Add exponential backoff delay between retries
+          if (attempt > 1) {
+            const baseDelay = 1000 * Math.pow(2, attempt - 2); // 1000ms, 2000ms, 4000ms, etc.
+            const jitter = Math.random() * 300; // 0-300ms random jitter
+            const delay = baseDelay + jitter;
+            console.log(`[Seminar] Retry attempt ${attempt}, waiting ${Math.round(delay)}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+
+          const { data, error } = await supabase
+            .from('requests')
+            .insert(insertData)
+            .select()
+            .single();
+
+          if (!error && data) {
+            console.log(`✅ Request created successfully on attempt ${attempt}:`, data.request_number);
+            request = data;
+            insertError = null;
+            break;
+          }
+          
+          // Log error details for debugging
+          if (error) {
+            console.warn(`[Seminar] Insert error on attempt ${attempt}:`, {
+              code: error.code,
+              message: error.message?.substring(0, 100),
+              isDuplicate: error.code === '23505',
+            });
+          }
+
+          // Only retry for duplicate key errors (race condition), not for network/abort errors
+          const isAbortError = error.message?.includes('Aborted') || error.message?.includes('abort') || error.name === 'AbortError';
+          const isTimeoutError = error.message?.includes('timeout') || error.message?.includes('Timeout');
+          
+          // Don't retry on abort/timeout - these indicate network issues, not server issues
+          if (isAbortError || isTimeoutError) {
+            insertError = error;
+            break;
+          }
+
+          // Check if it's a duplicate key error on request_number
+          const isDuplicateKey = error.code === '23505' && (
+            error.message?.includes('request_number') || 
+            error.message?.includes('requests_request_number_key') ||
+            error.details?.includes('request_number') ||
+            error.hint?.includes('request_number')
+          );
+
+          // If it's a duplicate key error, retry with minimal delay
+          // PostgreSQL sequences are atomic, so this should be rare
+          if (isDuplicateKey && attempt < maxRetries) {
+            console.warn(`🔄 Duplicate request number detected on attempt ${attempt}/${maxRetries}, retrying...`);
+            // Minimal delay - sequences are atomic, just need a tiny gap
+            const delay = 100 + Math.random() * 200; // 100-300ms
+            await new Promise(resolve => setTimeout(resolve, delay));
+            // Ensure request_number is explicitly null for retry
+            insertData.request_number = null;
+            continue;
+          }
+
+          // For other errors or final attempt, break and throw
+          insertError = error;
+          break;
+        } catch (err: any) {
+          // Catch any unexpected errors during insert
+          insertError = err;
+          break;
+        }
+      }
+
+      if (insertError || !request) {
+        console.error('Seminar submission error after', maxRetries, 'attempts:', insertError);
+        throw insertError || new Error('Failed to create request after retries');
       }
 
       // Create history entry
@@ -405,17 +484,116 @@ export default function SeminarScreen() {
         comments: 'Seminar application created and submitted',
       });
 
-      // Create notification
-      await supabase.from('notifications').insert({
-        user_id: profile.id,
-        notification_type: 'request_submitted',
-        title: 'Seminar Application Submitted',
-        message: `Your seminar application ${request.request_number || 'has been submitted'} and is now pending approval.`,
-        related_type: 'request',
-        related_id: request.id,
-        action_url: `/request/${request.id}`,
-        priority: 'normal',
-      });
+      // Create notification for requester (silently fail if RLS blocks it)
+      try {
+        await supabase.from('notifications').insert({
+          user_id: profile.id,
+          notification_type: 'request_submitted',
+          title: 'Seminar Application Submitted',
+          message: `Your seminar application ${request.request_number || 'has been submitted'} and is now pending approval.`,
+          related_type: 'request',
+          related_id: request.id,
+          action_url: `/request/${request.id}`,
+          priority: 'normal',
+        });
+      } catch (notifError: any) {
+        // Silently handle notification errors - not critical
+        console.warn('[Seminar] Notification creation failed (non-critical):', notifError?.code);
+      }
+
+      // Notify next approver based on initial status
+      try {
+        const { notifyNextApprover } = await import('@/lib/notifications');
+        
+        if (initialStatus === 'pending_head') {
+          // Find department head and notify
+          if (departmentId) {
+            const { data: headUsers, error: headError } = await supabase
+              .from('users')
+              .select('id, name')
+              .eq('department_id', departmentId)
+              .eq('is_head', true)
+              .eq('is_active', true)
+              .limit(1);
+            
+            if (headError) {
+              console.error('[Seminar] Error fetching head:', headError);
+            } else if (headUsers && headUsers.length > 0) {
+              try {
+                const success = await notifyNextApprover(
+                  headUsers[0].id,
+                  request.id,
+                  request.request_number || 'DRAFT',
+                  profile.name || 'Requester',
+                  'head'
+                );
+                if (success) {
+                  console.log(`[Seminar] ✅ Notified head ${headUsers[0].id} for request ${request.request_number}`);
+                } else {
+                  console.error(`[Seminar] ❌ Failed to notify head ${headUsers[0].id} for request ${request.request_number}`);
+                }
+              } catch (notifErr: any) {
+                console.error('[Seminar] Exception notifying head:', {
+                  error: notifErr,
+                  message: notifErr?.message,
+                  code: notifErr?.code,
+                });
+              }
+            } else {
+              console.warn('[Seminar] No active head users found in department', departmentId);
+            }
+          }
+        } else if (initialStatus === 'pending_admin') {
+          // Find admin users and notify
+          const { data: adminUsers, error: adminError } = await supabase
+            .from('users')
+            .select('id, name')
+            .eq('is_admin', true)
+            .eq('is_active', true)
+            .limit(5); // Notify up to 5 admins
+          
+          if (adminError) {
+            console.error('[Seminar] Error fetching admins:', adminError);
+          } else if (adminUsers && adminUsers.length > 0) {
+            const notificationPromises = adminUsers.map(admin =>
+              notifyNextApprover(
+                admin.id,
+                request.id,
+                request.request_number || 'DRAFT',
+                profile.name || 'Requester',
+                'admin'
+              ).catch(err => {
+                console.error(`[Seminar] Failed to notify admin ${admin.id}:`, {
+                  error: err,
+                  message: err?.message,
+                  code: err?.code,
+                });
+                return false;
+              })
+            );
+            
+            const results = await Promise.all(notificationPromises);
+            const successCount = results.filter(r => r === true).length;
+            if (successCount > 0) {
+              console.log(`[Seminar] ✅ Notified ${successCount}/${adminUsers.length} admin(s) for request ${request.request_number}`);
+            } else {
+              console.error(`[Seminar] ❌ Failed to notify any admins for request ${request.request_number}`);
+            }
+          } else {
+            console.warn('[Seminar] No active admin users found to notify');
+          }
+        }
+      } catch (notifError: any) {
+        // Log full error details for debugging
+        console.error('[Seminar] Next approver notification failed:', {
+          error: notifError,
+          message: notifError?.message,
+          code: notifError?.code,
+          stack: notifError?.stack?.substring(0, 200),
+          initialStatus,
+          requestNumber: request.request_number,
+        });
+      }
 
       Alert.alert(
         'Success',
@@ -429,9 +607,44 @@ export default function SeminarScreen() {
       );
     } catch (error: any) {
       console.error('Error submitting seminar:', error);
+      
+      // Handle specific error types with empathetic messages
+      let errorMessage = 'An error occurred while submitting your application. Please try again.';
+      let errorTitle = 'Submission Failed';
+      let showRetry = false;
+      
+      if (error.code === '23505') {
+        errorTitle = 'Submission Conflict';
+        errorMessage = 'A request with the same number already exists. Please try again - the system will generate a new request number.';
+        showRetry = true;
+      } else if (error.code === '23503') {
+        errorTitle = 'Invalid Information';
+        errorMessage = 'Some of the information provided is not valid. Please check your selections and try again.';
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorTitle = 'Connection Error';
+        errorMessage = 'We couldn\'t connect to the server. Please check your internet connection and try again.';
+        showRetry = true;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       Alert.alert(
-        'Submission Failed',
-        error.message || 'An error occurred while submitting your application. Please try again.'
+        errorTitle,
+        errorMessage,
+        showRetry
+          ? [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Retry', 
+                style: 'default',
+                onPress: () => {
+                  setTimeout(() => {
+                    handleSubmit(status);
+                  }, 500);
+                }
+              }
+            ]
+          : [{ text: 'OK', style: 'default' }]
       );
     } finally {
       setSubmitting(false);

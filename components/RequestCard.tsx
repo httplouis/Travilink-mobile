@@ -46,7 +46,7 @@ export default function RequestCard({
 
       {/* Title */}
       <Text style={styles.title} numberOfLines={2}>
-        {request.title || request.purpose}
+        {request.title || request.purpose || 'Untitled Request'}
       </Text>
 
       {/* Details */}

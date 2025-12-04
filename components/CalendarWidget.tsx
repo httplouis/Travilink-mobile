@@ -28,6 +28,7 @@ export default function CalendarWidget({ userId }: CalendarWidgetProps) {
   const { data: bookings = [] } = useCalendar(userId, monthStart, monthEnd);
   
   // Count bookings per date for capacity display
+  // Since useCalendar now expands multi-day trips, each booking is already for a specific date
   const bookingsByDate: Record<string, number> = {};
   bookings.forEach((booking) => {
     const dateKey = booking.dateISO;

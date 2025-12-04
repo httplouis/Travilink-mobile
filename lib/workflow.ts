@@ -54,8 +54,14 @@ export class WorkflowEngine {
     }
     
     if (requesterIsHead) {
-      // Requesting person is a head, can go directly to admin
-      return 'pending_admin';
+      // Requesting person is a head
+      // If has budget, skip admin and go directly to comptroller
+      // Otherwise, go to admin first
+      if (hasBudget) {
+        return 'pending_comptroller';
+      } else {
+        return 'pending_admin';
+      }
     } else {
       // Requesting person is NOT a head, send to their department head first
       return 'pending_head';

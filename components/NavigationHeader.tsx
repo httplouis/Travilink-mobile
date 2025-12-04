@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -21,8 +21,34 @@ export default function NavigationHeader({
   showBack = false,
 }: NavigationHeaderProps) {
   const { profile } = useAuth();
-  const { notifications } = useNotifications(profile?.id || '');
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  
+  const { notifications, isLoading: notificationsLoading } = useNotifications(profile?.id || '');
+  
+  // Debug logging for notification fetching
+  useEffect(() => {
+    if (profile?.id) {
+      console.log('[NavigationHeader] Profile ID for notifications:', profile.id);
+      console.log('[NavigationHeader] Profile email:', profile.email);
+    } else {
+      console.warn('[NavigationHeader] No profile ID available for notifications');
+    }
+  }, [profile?.id]);
+  
+  // Safely calculate unread count - handle undefined/null notifications
+  const unreadCount = Array.isArray(notifications) 
+    ? notifications.filter((n) => n && !n.is_read).length 
+    : 0;
+  
+  // Debug logging for notification count
+  useEffect(() => {
+    if (profile?.id) {
+      console.log('[NavigationHeader] Notification count:', {
+        total: notifications?.length || 0,
+        unread: unreadCount,
+        profileId: profile.id,
+      });
+    }
+  }, [notifications, unreadCount, profile?.id]);
 
   const handleNotificationPress = () => {
     router.push('/notifications');
@@ -124,29 +150,37 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: -4,
+    right: -4,
     backgroundColor: '#dc2626',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    borderWidth: 2,
+    paddingHorizontal: 7,
+    borderWidth: 2.5,
     borderColor: '#fff',
+    zIndex: 100,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
   badgeLarge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    paddingHorizontal: 9,
   },
   badgeText: {
     color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     textAlign: 'center',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   profileButton: {
     padding: 2,

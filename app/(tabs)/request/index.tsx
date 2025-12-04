@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import NavigationHeader from '@/components/NavigationHeader';
 import SidebarMenu from '@/components/SidebarMenu';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRequests } from '@/hooks/useRequests';
+import RequestCard from '@/components/RequestCard';
+import { formatDate } from '@/lib/utils';
 
 export default function RequestScreen() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const { profile } = useAuth();
+  const { requests, isLoading } = useRequests(profile?.id || '');
+  
+  // Filter drafts
+  const drafts = requests.filter(req => req.status === 'draft');
 
   return (
     <View style={styles.container}>
@@ -16,39 +25,89 @@ export default function RequestScreen() {
         showNotification={true}
         showMenu={true}
       />
-      <View style={styles.content}>
-        <Ionicons name="add-circle-outline" size={64} color="#7a0019" />
-        <Text style={styles.title}>Create New Request</Text>
-        <Text style={styles.subtitle}>
-          Start a new travel order or seminar application
-        </Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Drafts Section */}
+        {drafts.length > 0 && (
+          <View style={styles.draftsSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="document-text-outline" size={20} color="#7a0019" />
+              <Text style={styles.sectionTitle}>My Drafts ({drafts.length})</Text>
+            </View>
+            <FlatList
+              data={drafts.slice(0, 3)}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.draftCard}
+                  onPress={() => {
+                    router.push(`/request/${item.id}`);
+                  }}
+                >
+                  <View style={styles.draftCardHeader}>
+                    <Text style={styles.draftRequestNumber}>{item.request_number || 'DRAFT'}</Text>
+                    <Text style={styles.draftType}>
+                      {item.request_type === 'travel_order' ? 'TO' : 'SA'}
+                    </Text>
+                  </View>
+                  <Text style={styles.draftDestination} numberOfLines={1}>
+                    {item.destination || 'No destination'}
+                  </Text>
+                  <Text style={styles.draftDate}>
+                    {item.created_at ? `Created ${formatDate(item.created_at)}` : 'Recently created'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListFooterComponent={
+                drafts.length > 3 ? (
+                  <TouchableOpacity
+                    style={styles.viewAllDrafts}
+                    onPress={() => router.push('/(tabs)/submissions?filter=draft')}
+                  >
+                    <Text style={styles.viewAllText}>View All Drafts ({drafts.length})</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#7a0019" />
+                  </TouchableOpacity>
+                ) : null
+              }
+            />
+          </View>
+        )}
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/request/travel-order')}
-          >
-            <Ionicons name="car-outline" size={24} color="#fff" />
-            <Text style={styles.actionButtonText}>Travel Order</Text>
-            <Text style={styles.actionButtonSubtext}>
-              Request transportation for official travel
-            </Text>
-          </TouchableOpacity>
+        {/* Create New Section */}
+        <View style={styles.content}>
+          <Ionicons name="add-circle-outline" size={64} color="#7a0019" />
+          <Text style={styles.title}>Create New Request</Text>
+          <Text style={styles.subtitle}>
+            Start a new travel order or seminar application
+          </Text>
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonSecondary]}
-            onPress={() => router.push('/request/seminar')}
-          >
-            <Ionicons name="school-outline" size={24} color="#7a0019" />
-            <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
-              Seminar Application
-            </Text>
-            <Text style={styles.actionButtonSubtextSecondary}>
-              Apply for training or seminar participation
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => router.push('/request/travel-order')}
+            >
+              <Ionicons name="car-outline" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>Travel Order</Text>
+              <Text style={styles.actionButtonSubtext}>
+                Request transportation for official travel
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionButtonSecondary]}
+              onPress={() => router.push('/request/seminar')}
+            >
+              <Ionicons name="school-outline" size={24} color="#7a0019" />
+              <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
+                Seminar Application
+              </Text>
+              <Text style={styles.actionButtonSubtextSecondary}>
+                Apply for training or seminar participation
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </ScrollView>
       <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
     </View>
   );
@@ -59,8 +118,79 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  draftsSection: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  draftCard: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  draftCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  draftRequestNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  draftType: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#7a0019',
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  draftDestination: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  draftDate: {
+    fontSize: 11,
+    color: '#9ca3af',
+  },
+  viewAllDrafts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 4,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7a0019',
+  },
+  content: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,

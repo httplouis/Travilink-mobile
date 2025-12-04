@@ -732,13 +732,17 @@ const styles = StyleSheet.create({
   },
   headerCardTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 12,
+    gap: 12,
+    flexWrap: 'wrap',
   },
   requestNumberContainer: {
     flex: 1,
     gap: 8,
+    minWidth: 0, // Allow text to wrap
+    flexShrink: 1,
   },
   requestNumber: {
     fontSize: 20,

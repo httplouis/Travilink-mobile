@@ -22,6 +22,7 @@ import SidebarMenu from '@/components/SidebarMenu';
 
 const STATUS_OPTIONS: (RequestStatus | 'all')[] = [
   'all',
+  'draft',
   'pending_head',
   'pending_parent_head',
   'pending_admin',
@@ -204,7 +205,11 @@ export default function SubmissionsScreen() {
                   statusFilter === status && styles.filterChipTextActive,
                 ]}
               >
-                {status === 'all' ? 'All' : status.replace('pending_', '').replace('_', ' ')}
+                {status === 'all' 
+                  ? 'All' 
+                  : status === 'draft'
+                  ? 'Draft'
+                  : status.replace('pending_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </Text>
             </TouchableOpacity>
           ))}

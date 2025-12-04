@@ -107,36 +107,26 @@ export default function CalendarScreen() {
     );
   }
 
-  // Group bookings by date (handle date range for multi-day trips)
-  // Also track status counts for privacy (pending vs approved)
+  // Group bookings by date
+  // NOTE: useCalendar hook now expands multi-day trips, so each booking is already for a specific date
+  // We just need to group them by date
   const bookingsByDate: Record<string, Booking[]> = {};
   const statusCountsByDate: Record<string, { pending: number; approved: number }> = {};
   
   bookings.forEach((booking) => {
-    const startDate = new Date(booking.dateISO + 'T00:00:00');
-    const endDateISO = (booking as any).endDateISO || booking.dateISO;
-    const endDate = new Date(endDateISO + 'T23:59:59');
+    const dateKey = booking.dateISO;
     
-    // Mark all dates in the range
-    let currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-      const dateKey = currentDate.toISOString().split('T')[0];
-      
-      if (!bookingsByDate[dateKey]) {
-        bookingsByDate[dateKey] = [];
-        statusCountsByDate[dateKey] = { pending: 0, approved: 0 };
-      }
-      bookingsByDate[dateKey].push(booking);
-      
-      // Track status counts (privacy: don't show personal details)
-      if (booking.status === 'approved') {
-        statusCountsByDate[dateKey].approved++;
-      } else {
-        statusCountsByDate[dateKey].pending++;
-      }
-      
-      // Move to next day
-      currentDate.setDate(currentDate.getDate() + 1);
+    if (!bookingsByDate[dateKey]) {
+      bookingsByDate[dateKey] = [];
+      statusCountsByDate[dateKey] = { pending: 0, approved: 0 };
+    }
+    bookingsByDate[dateKey].push(booking);
+    
+    // Track status counts (privacy: don't show personal details)
+    if (booking.status === 'approved') {
+      statusCountsByDate[dateKey].approved++;
+    } else {
+      statusCountsByDate[dateKey].pending++;
     }
   });
 

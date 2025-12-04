@@ -37,13 +37,11 @@ export function useComptrollerInbox(comptrollerId: string) {
           if (requestsError.message?.includes('Aborted') || requestsError.message?.includes('abort')) {
             return [];
           }
-          // Only log error if there's meaningful error info
-          if (requestsError.code || requestsError.message) {
-            console.error('[useComptrollerInbox] Error fetching requests:', {
-              code: requestsError.code,
-              message: requestsError.message,
-            });
-          }
+          // Silently log error - don't show to user, just return empty array
+          console.warn('[useComptrollerInbox] Query error (non-critical):', {
+            code: requestsError.code,
+            message: requestsError.message?.substring(0, 100),
+          });
           // Return empty array instead of throwing to prevent UI crashes
           return [];
         }
@@ -55,7 +53,11 @@ export function useComptrollerInbox(comptrollerId: string) {
         if (err?.message?.includes('Aborted') || err?.message?.includes('abort') || err?.name === 'AbortError') {
           return [];
         }
-        throw err;
+        // Silently log and return empty array instead of throwing
+        console.warn('[useComptrollerInbox] Exception (non-critical):', {
+          message: err?.message?.substring(0, 100),
+        });
+        return [];
       }
     },
     enabled: !!comptrollerId,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { useApproveRequest } from '@/hooks/useApproveRequest';
 import { useAuth } from '@/contexts/AuthContext';
 import NavigationHeader from '@/components/NavigationHeader';
 import SignaturePad from '@/components/SignaturePad';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, formatDate, formatCurrency } from '@/lib/utils';
 
 interface ApprovalHistory {
   stage: string;
@@ -38,8 +38,48 @@ export default function ReviewScreen() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [returnReason, setReturnReason] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
+  const [autoSignature, setAutoSignature] = useState<string | null>(null);
+  const [isAutoSignEnabled, setIsAutoSignEnabled] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const { approveRequest, isSubmitting } = useApproveRequest();
   const { profile } = useAuth();
+
+  // Load auto-signature settings when component mounts or action changes
+  useEffect(() => {
+    if (!profile?.id || !action) return;
+    
+    const loadAutoSignature = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('automatic_signature, is_auto_sign_enabled')
+          .eq('id', profile.id)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116' || error.code === '42703') {
+            return; // Fields don't exist, that's okay
+          }
+          return;
+        }
+
+        if (data) {
+          setAutoSignature(data.automatic_signature || null);
+          setIsAutoSignEnabled(data.is_auto_sign_enabled || false);
+          
+          // Auto-fill signature if enabled
+          if (data.is_auto_sign_enabled && data.automatic_signature && !signature) {
+            setSignature(data.automatic_signature);
+          }
+        }
+      } catch (err) {
+        // Silently fail
+      }
+    };
+
+    loadAutoSignature();
+  }, [profile?.id, action]);
   
   const userRole = role as 'head' | 'vp' | 'president' | 'hr' | 'comptroller' | string;
 
@@ -87,7 +127,7 @@ export default function ReviewScreen() {
           stage: 'Department Head Approval',
           approverName: approversMap[request.head_approved_by]?.name || null,
           approvedAt: request.head_approved_at,
-          comments: request.head_approval_comments || null,
+          comments: request.head_comments || null,
           signature: request.head_signature || null,
         });
       }
@@ -96,7 +136,7 @@ export default function ReviewScreen() {
           stage: 'Parent Head Approval',
           approverName: approversMap[request.parent_head_approved_by]?.name || null,
           approvedAt: request.parent_head_approved_at,
-          comments: request.parent_head_approval_comments || null,
+          comments: request.parent_head_comments || null,
           signature: request.parent_head_signature || null,
         });
       }
@@ -105,7 +145,7 @@ export default function ReviewScreen() {
           stage: 'Administrator Processing',
           approverName: approversMap[request.admin_processed_by]?.name || null,
           approvedAt: request.admin_processed_at,
-          comments: request.admin_processing_comments || null,
+          comments: request.admin_comments || null,
           signature: request.admin_signature || null,
         });
       }
@@ -114,7 +154,7 @@ export default function ReviewScreen() {
           stage: 'Comptroller Approval',
           approverName: approversMap[request.comptroller_approved_by]?.name || null,
           approvedAt: request.comptroller_approved_at,
-          comments: request.comptroller_approval_comments || null,
+          comments: request.comptroller_comments || null,
           signature: request.comptroller_signature || null,
         });
       }
@@ -123,7 +163,7 @@ export default function ReviewScreen() {
           stage: 'HR Approval',
           approverName: approversMap[request.hr_approved_by]?.name || null,
           approvedAt: request.hr_approved_at,
-          comments: request.hr_approval_comments || null,
+          comments: request.hr_comments || null,
           signature: request.hr_signature || null,
         });
       }
@@ -132,7 +172,7 @@ export default function ReviewScreen() {
           stage: 'VP Approval',
           approverName: approversMap[request.vp_approved_by]?.name || null,
           approvedAt: request.vp_approved_at,
-          comments: request.vp_approval_comments || null,
+          comments: request.vp_comments || null,
           signature: request.vp_signature || null,
         });
       }
@@ -141,7 +181,7 @@ export default function ReviewScreen() {
           stage: 'President Approval',
           approverName: approversMap[request.president_approved_by]?.name || null,
           approvedAt: request.president_approved_at,
-          comments: request.president_approval_comments || null,
+          comments: request.president_comments || null,
           signature: request.president_signature || null,
         });
       }
@@ -170,24 +210,33 @@ export default function ReviewScreen() {
       return;
     }
 
-    const result = await approveRequest({
-      requestId: id!,
-      role: userRole as any,
-      action: 'approve',
-      signature,
-      comments: comments.trim() || undefined,
-    });
+    try {
+      console.log('[ReviewScreen] Approving request:', { requestId: id, role: userRole, hasSignature: !!signature });
+      const result = await approveRequest({
+        requestId: id!,
+        role: userRole as any,
+        action: 'approve',
+        signature,
+        comments: comments.trim() || undefined,
+      });
 
-    if (result.success) {
-      Alert.alert('Success', 'Request approved successfully.', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      console.log('[ReviewScreen] Approve result:', result);
+      
+      if (result && result.success) {
+        setSuccessMessage('Request approved successfully.');
+        setShowSuccessModal(true);
+      } else {
+        Alert.alert('Error', result?.error || 'Failed to approve request. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('[ReviewScreen] Error approving request:', error);
+      Alert.alert('Error', error.message || 'Failed to approve request. Please try again.');
     }
   };
 
   const handleReject = async () => {
     if (!rejectionReason.trim()) {
-      Alert.alert('Reason Required', 'Please provide a reason for rejection.');
+      Alert.alert('Reason Required', 'Please provide a reason for rejecting this request.');
       return;
     }
     if (!signature) {
@@ -195,18 +244,27 @@ export default function ReviewScreen() {
       return;
     }
 
-    const result = await approveRequest({
-      requestId: id!,
-      role: userRole as any,
-      action: 'reject',
-      signature,
-      comments: rejectionReason.trim(),
-    });
+    try {
+      console.log('[ReviewScreen] Rejecting request:', { requestId: id, role: userRole, hasSignature: !!signature, hasReason: !!rejectionReason.trim() });
+      const result = await approveRequest({
+        requestId: id!,
+        role: userRole as any,
+        action: 'reject',
+        signature,
+        rejectionReason: rejectionReason.trim(),
+      });
 
-    if (result.success) {
-      Alert.alert('Success', 'Request rejected successfully.', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      console.log('[ReviewScreen] Reject result:', result);
+      
+      if (result && result.success) {
+        setSuccessMessage('Request rejected successfully.');
+        setShowSuccessModal(true);
+      } else {
+        Alert.alert('Error', result?.error || 'Failed to reject request. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('[ReviewScreen] Error rejecting request:', error);
+      Alert.alert('Error', error.message || 'Failed to reject request. Please try again.');
     }
   };
 
@@ -220,18 +278,27 @@ export default function ReviewScreen() {
       return;
     }
 
-    const result = await approveRequest({
-      requestId: id!,
-      role: userRole as any,
-      action: 'return',
-      signature,
-      comments: returnReason.trim(),
-    });
+    try {
+      console.log('[ReviewScreen] Returning request:', { requestId: id, role: userRole, hasSignature: !!signature, hasReason: !!returnReason.trim() });
+      const result = await approveRequest({
+        requestId: id!,
+        role: userRole as any,
+        action: 'return',
+        signature,
+        returnReason: returnReason.trim(),
+      });
 
-    if (result.success) {
-      Alert.alert('Success', 'Request returned to sender successfully.', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      console.log('[ReviewScreen] Return result:', result);
+      
+      if (result && result.success) {
+        setSuccessMessage('Request returned to sender successfully.');
+        setShowSuccessModal(true);
+      } else {
+        Alert.alert('Error', result?.error || 'Failed to return request. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('[ReviewScreen] Error returning request:', error);
+      Alert.alert('Error', error.message || 'Failed to return request. Please try again.');
     }
   };
 
@@ -289,59 +356,258 @@ export default function ReviewScreen() {
   }
 
   const { request, approvalHistory } = requestData;
+  const expenseBreakdown = request.expense_breakdown && Array.isArray(request.expense_breakdown) 
+    ? request.expense_breakdown
+    : [];
+  const participants = request.participants && Array.isArray(request.participants) 
+    ? request.participants 
+    : [];
+
+  // Calculate duration
+  const getDuration = () => {
+    if (!request.travel_start_date || !request.travel_end_date) return null;
+    try {
+      const start = new Date(request.travel_start_date);
+      const end = new Date(request.travel_end_date);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays === 0 ? 'Same day' : `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+    } catch {
+      return null;
+    }
+  };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <NavigationHeader title={getRoleTitle()} showBack={true} showMenu={false} showNotification={false} />
+    <View style={styles.container}>
+      <View style={{ paddingTop: insets.top, backgroundColor: '#fff' }}>
+        <NavigationHeader title={getRoleTitle()} showBack={true} showMenu={false} showNotification={false} />
+      </View>
+      
+      {/* Scrollable Content */}
       <ScrollView 
         style={styles.scrollView} 
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, action && styles.scrollContentWithAction]}
         scrollEnabled={!isDrawing}
         showsVerticalScrollIndicator={true}
       >
-        {/* Request Summary Card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <View style={styles.summaryHeaderLeft}>
-              <Ionicons name="document-text" size={20} color="#fff" />
-              <Text style={styles.summaryTitle}>Request Summary</Text>
-            </View>
-            <View style={styles.requestNumberBadge}>
-              <Text style={styles.requestNumberText}>{request.request_number}</Text>
-            </View>
+        {/* PRIORITY 1: Requester Information - Most Important for HEAD */}
+        <View style={styles.requesterCard}>
+          <View style={styles.requesterHeader}>
+            <Ionicons name="person-circle" size={20} color="#fff" />
+            <Text style={styles.requesterTitle}>Requester Information</Text>
           </View>
-          <View style={styles.summaryContent}>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryRowLeft}>
-                <Ionicons name="location" size={16} color="#6b7280" />
-                <Text style={styles.summaryLabel}>Destination</Text>
-              </View>
-              <Text style={styles.summaryValue}>{request.destination || 'N/A'}</Text>
-            </View>
-            {request.total_budget && (
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryRowLeft}>
-                  <Ionicons name="cash" size={16} color="#6b7280" />
-                  <Text style={styles.summaryLabel}>Budget</Text>
+          <View style={styles.requesterContent}>
+            {request.requester_name && (
+              <View style={styles.requesterRow}>
+                <View style={styles.requesterRowLeft}>
+                  <Ionicons name="person" size={16} color="#6b7280" />
+                  <Text style={styles.requesterLabel}>Requester</Text>
                 </View>
-                <Text style={[styles.summaryValue, styles.budgetValue]}>
-                  ₱{request.total_budget.toLocaleString()}
+                <Text style={styles.requesterValue}>{request.requester_name}</Text>
+              </View>
+            )}
+            {request.request_type && (
+              <View style={styles.requesterRow}>
+                <View style={styles.requesterRowLeft}>
+                  <Ionicons name="folder" size={16} color="#6b7280" />
+                  <Text style={styles.requesterLabel}>Type</Text>
+                </View>
+                <Text style={styles.requesterValue}>
+                  {request.request_type === 'travel_order' ? 'Travel Order' : 'Seminar Application'}
                 </Text>
               </View>
             )}
-            {request.requester_name && (
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryRowLeft}>
-                  <Ionicons name="person" size={16} color="#6b7280" />
-                  <Text style={styles.summaryLabel}>Requester</Text>
+            {request.request_number && (
+              <View style={styles.requesterRow}>
+                <View style={styles.requesterRowLeft}>
+                  <Ionicons name="document-text" size={16} color="#6b7280" />
+                  <Text style={styles.requesterLabel}>Request Number</Text>
                 </View>
-                <Text style={styles.summaryValue}>{request.requester_name}</Text>
+                <Text style={[styles.requesterValue, styles.requestNumberValue]}>
+                  {request.request_number}
+                </Text>
               </View>
             )}
           </View>
         </View>
 
-        {/* Approval History */}
+        {/* PRIORITY 2: Travel Details - When they're leaving */}
+        {(request.travel_start_date || request.travel_end_date || request.purpose || request.destination) && (
+          <View style={styles.detailCard}>
+            <View style={styles.detailCardHeader}>
+              <Ionicons name="calendar" size={18} color="#7a0019" />
+              <Text style={styles.detailCardTitle}>Travel Details</Text>
+            </View>
+            <View style={styles.detailCardContent}>
+              {request.destination && (
+                <View style={styles.detailRow}>
+                  <View style={styles.detailRowLeft}>
+                    <Ionicons name="location" size={16} color="#6b7280" />
+                    <Text style={styles.detailLabel}>Destination</Text>
+                  </View>
+                  <Text style={styles.detailValue}>{request.destination}</Text>
+                </View>
+              )}
+              {request.travel_start_date && (
+                <View style={styles.detailRow}>
+                  <View style={styles.detailRowLeft}>
+                    <Ionicons name="airplane" size={16} color="#6b7280" />
+                    <Text style={styles.detailLabel}>Departure Date</Text>
+                  </View>
+                  <Text style={styles.detailValue}>{formatDate(request.travel_start_date)}</Text>
+                </View>
+              )}
+              {request.travel_end_date && (
+                <View style={styles.detailRow}>
+                  <View style={styles.detailRowLeft}>
+                    <Ionicons name="airplane-outline" size={16} color="#6b7280" />
+                    <Text style={styles.detailLabel}>Return Date</Text>
+                  </View>
+                  <Text style={styles.detailValue}>{formatDate(request.travel_end_date)}</Text>
+                </View>
+              )}
+              {getDuration() && (
+                <View style={styles.detailRow}>
+                  <View style={styles.detailRowLeft}>
+                    <Ionicons name="time" size={16} color="#6b7280" />
+                    <Text style={styles.detailLabel}>Duration</Text>
+                  </View>
+                  <Text style={styles.detailValue}>{getDuration()}</Text>
+                </View>
+              )}
+              {request.purpose && (
+                <View style={styles.detailRow}>
+                  <View style={styles.detailRowLeft}>
+                    <Ionicons name="document-text-outline" size={16} color="#6b7280" />
+                    <Text style={styles.detailLabel}>Purpose</Text>
+                  </View>
+                  <Text style={[styles.detailValue, styles.purposeText]}>{request.purpose}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* PRIORITY 3: Budget - Above Requester Signature */}
+        {request.has_budget && request.total_budget && (
+          <View style={styles.budgetSection}>
+            <Text style={styles.sectionTitle}>Budget</Text>
+            <Text style={styles.budgetAmount}>
+              {formatCurrency(request.total_budget)}
+            </Text>
+            {expenseBreakdown.length > 0 && (
+              <View style={styles.budgetBreakdown}>
+                {expenseBreakdown.map((expense: any, index: number) => (
+                  <View key={index} style={styles.budgetItem}>
+                    <View>
+                      <Text style={styles.budgetItemCategory}>
+                        {expense.category || expense.item || 'Expense'}
+                      </Text>
+                      {expense.description && (
+                        <Text style={styles.budgetItemDescription}>
+                          {expense.description}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.budgetItemAmount}>
+                      {formatCurrency(expense.amount)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* PRIORITY 4: Requester Signature */}
+        {request.requester_signature && (
+          <View style={styles.detailCard}>
+            <View style={styles.detailCardHeader}>
+              <Ionicons name="create" size={18} color="#7a0019" />
+              <Text style={styles.detailCardTitle}>Requester Signature</Text>
+            </View>
+            <View style={styles.signatureDisplayContainer}>
+              <Image 
+                source={{ uri: request.requester_signature }} 
+                style={styles.signatureDisplayImage} 
+                resizeMode="contain"
+              />
+              {request.requester_name && (
+                <Text style={styles.signatureDisplayName}>{request.requester_name}</Text>
+              )}
+              {request.created_at && (
+                <Text style={styles.signatureDisplayDate}>
+                  Submitted on {formatDate(request.created_at)}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* PRIORITY 5: Participants - Who's going */}
+        {participants.length > 0 && (
+          <View style={styles.detailCard}>
+            <View style={styles.detailCardHeader}>
+              <Ionicons name="people" size={18} color="#7a0019" />
+              <Text style={styles.detailCardTitle}>Participants ({participants.length})</Text>
+            </View>
+            <View style={styles.detailCardContent}>
+              {participants.map((participant: any, index: number) => (
+                <View key={index} style={[styles.detailRow, index < participants.length - 1 && styles.detailRowBorder]}>
+                  <View style={styles.participantInfo}>
+                    <View style={styles.participantHeader}>
+                      <Text style={styles.participantName}>{participant.name || 'Unknown'}</Text>
+                      {participant.is_head && (
+                        <View style={styles.headBadge}>
+                          <Text style={styles.headBadgeText}>Head</Text>
+                        </View>
+                      )}
+                    </View>
+                    {participant.email && (
+                      <Text style={styles.participantEmail}>{participant.email}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* PRIORITY 6: Vehicle Information - If needed */}
+        {request.needs_vehicle && (
+          <View style={styles.detailCard}>
+            <View style={styles.detailCardHeader}>
+              <Ionicons name="car" size={18} color="#7a0019" />
+              <Text style={styles.detailCardTitle}>Transportation</Text>
+            </View>
+            <View style={styles.detailCardContent}>
+              {request.transportation_type && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Type</Text>
+                  <Text style={styles.detailValue}>
+                    {request.transportation_type === 'institutional' ? 'Institutional Vehicle' : 
+                     request.transportation_type === 'owned' ? 'Personal Vehicle' :
+                     request.transportation_type === 'rent' ? 'Rental Vehicle' : request.transportation_type}
+                  </Text>
+                </View>
+              )}
+              {request.vehicle_type && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Vehicle Type</Text>
+                  <Text style={styles.detailValue}>{request.vehicle_type.toUpperCase()}</Text>
+                </View>
+              )}
+              {request.pickup_location && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Pickup Location</Text>
+                  <Text style={styles.detailValue}>{request.pickup_location}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* PRIORITY 7: Approval History - Least Priority */}
         {approvalHistory.length > 0 && (
           <View style={styles.historyCard}>
             <View style={styles.sectionHeader}>
@@ -350,7 +616,7 @@ export default function ReviewScreen() {
             </View>
             <View style={styles.historyList}>
               {approvalHistory.map((item, index) => (
-                <View key={index} style={styles.historyItem}>
+                <View key={index} style={[styles.historyItem, index < approvalHistory.length - 1 && styles.historyItemBorder]}>
                   <View style={styles.historyItemHeader}>
                     <View style={styles.historyItemLeft}>
                       <View style={styles.historyIcon}>
@@ -359,14 +625,10 @@ export default function ReviewScreen() {
                       <View style={styles.historyContent}>
                         <Text style={styles.historyStage}>{item.stage}</Text>
                         {item.approverName && (
-                          <Text style={styles.historyApprover}>
-                            {item.approverName}
-                          </Text>
+                          <Text style={styles.historyApprover}>{item.approverName}</Text>
                         )}
                         {item.approvedAt && (
-                          <Text style={styles.historyTime}>
-                            {formatDateTime(item.approvedAt)}
-                          </Text>
+                          <Text style={styles.historyTime}>{formatDateTime(item.approvedAt)}</Text>
                         )}
                       </View>
                     </View>
@@ -391,91 +653,139 @@ export default function ReviewScreen() {
           </View>
         )}
 
-        {/* Action Selection */}
-        {!action && (
-          <View style={styles.actionSelectionCard}>
-            <Text style={styles.actionSelectionTitle}>Select Action</Text>
-            <View style={styles.actionButtons}>
+        {/* Bottom padding for fixed action buttons */}
+        <View style={{ height: action ? 400 : 100 }} />
+      </ScrollView>
+
+      {/* Fixed Action Buttons at Bottom */}
+      {!action && (
+        <View style={[styles.fixedActionContainer, { paddingBottom: insets.bottom }]}>
+          <View style={styles.fixedActionButtons}>
+            {canReturnToSender && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.approveButton]}
-                onPress={() => setAction('approve')}
+                style={[styles.fixedActionButton, styles.fixedReturnButton]}
+                onPress={() => setAction('return')}
                 activeOpacity={0.8}
               >
-                <View style={styles.actionButtonIcon}>
-                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                </View>
-                <Text style={styles.actionButtonText}>Approve</Text>
+                <Ionicons name="arrow-undo" size={22} color="#fff" />
+                <Text style={styles.fixedActionButtonText}>Return</Text>
               </TouchableOpacity>
-              {canReturnToSender && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.returnButton]}
-                  onPress={() => setAction('return')}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.actionButtonIcon}>
-                    <Ionicons name="arrow-undo" size={24} color="#fff" />
-                  </View>
-                  <Text style={styles.actionButtonText}>Return to Sender</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[styles.actionButton, styles.rejectButton]}
-                onPress={() => setAction('reject')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.actionButtonIcon}>
-                  <Ionicons name="close-circle" size={24} color="#fff" />
-                </View>
-                <Text style={styles.actionButtonText}>Reject</Text>
-              </TouchableOpacity>
-            </View>
+            )}
+            <TouchableOpacity
+              style={[styles.fixedActionButton, styles.fixedRejectButton]}
+              onPress={() => setAction('reject')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle" size={22} color="#fff" />
+              <Text style={styles.fixedActionButtonText}>Reject</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.fixedActionButton, styles.fixedApproveButton]}
+              onPress={() => setAction('approve')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={styles.fixedActionButtonText}>Approve</Text>
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
+      )}
 
-        {/* Approval Form */}
-        {action === 'approve' && (
-          <View style={styles.formCard}>
-            <View style={styles.formHeader}>
-              <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
-              <Text style={styles.formTitle}>Approve Request</Text>
-            </View>
-            
-            <View style={styles.formSection}>
-              <Text style={styles.formLabel}>Comments (Optional)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter approval comments..."
-                placeholderTextColor="#9ca3af"
-                value={comments}
-                onChangeText={setComments}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
+      {/* Action Form Modal Overlay */}
+      {action && (
+        <View style={styles.actionFormOverlay}>
+          <TouchableOpacity 
+            style={styles.actionFormOverlayBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              setAction(null);
+              setSignature('');
+              setComments('');
+              setRejectionReason('');
+              setReturnReason('');
+            }}
+          />
+          <View style={[styles.actionFormContainer, { paddingBottom: insets.bottom }]}>
+            <View style={styles.actionFormHeader}>
+              <Text style={styles.actionFormTitle}>
+                {action === 'approve' ? 'Approve Request' :
+                 action === 'reject' ? 'Reject Request' : 'Return to Sender'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setAction(null);
+                  setSignature('');
+                  setComments('');
+                  setRejectionReason('');
+                  setReturnReason('');
+                }}
+                style={styles.closeFormButton}
+              >
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.formSection}>
-              <View style={styles.signatureHeader}>
+            <ScrollView 
+              style={styles.actionFormScroll}
+              contentContainerStyle={styles.actionFormContent}
+              scrollEnabled={!isDrawing}
+            >
+              {/* Comments Section */}
+              <View style={styles.formSection}>
                 <Text style={styles.formLabel}>
-                  Signature <Text style={styles.required}>*</Text>
+                  {action === 'approve' ? 'Comments (Optional)' :
+                   action === 'reject' ? 'Rejection Reason *' : 'Return Reason *'}
                 </Text>
-                <Text style={styles.signatureHint}>
-                  Sign with your finger — it auto-saves when you lift
-                </Text>
-              </View>
-              <View style={styles.signatureContainer}>
-                <SignaturePad
-                  height={180}
-                  value={signature || null}
-                  onSave={(dataUrl) => setSignature(dataUrl)}
-                  onClear={() => setSignature('')}
-                  hideSaveButton
-                  onDrawingStart={() => setIsDrawing(true)}
-                  onDrawingEnd={() => setIsDrawing(false)}
+                <TextInput
+                  style={styles.textInput}
+                  placeholder={
+                    action === 'approve' ? 'Enter approval comments (optional)...' :
+                    action === 'reject' ? 'Enter reason for rejection (required)...' :
+                    'Enter reason for returning to sender...'
+                  }
+                  placeholderTextColor="#9ca3af"
+                  value={action === 'approve' ? comments : action === 'reject' ? rejectionReason : returnReason}
+                  onChangeText={action === 'approve' ? setComments : action === 'reject' ? setRejectionReason : setReturnReason}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
                 />
               </View>
-            </View>
 
+              {/* Signature Section */}
+              <View style={styles.formSection}>
+                <View style={styles.signatureHeader}>
+                  <Text style={styles.formLabel}>
+                    Signature <Text style={styles.required}>*</Text>
+                  </Text>
+                  {autoSignature && (
+                    <TouchableOpacity
+                      style={styles.useSavedSignatureButton}
+                      onPress={() => {
+                        setSignature(autoSignature);
+                        Alert.alert('Success', 'Saved signature loaded.');
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                      <Text style={styles.useSavedSignatureText}>Use Saved Signature</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.signatureContainer}>
+                  <SignaturePad
+                    height={180}
+                    value={signature || null}
+                    onSave={(dataUrl) => setSignature(dataUrl)}
+                    onClear={() => setSignature('')}
+                    hideSaveButton
+                    onDrawingStart={() => setIsDrawing(true)}
+                    onDrawingEnd={() => setIsDrawing(false)}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Form Action Buttons */}
             <View style={styles.formActions}>
               <TouchableOpacity
                 style={[styles.formButton, styles.cancelButton]}
@@ -483,163 +793,7 @@ export default function ReviewScreen() {
                   setAction(null);
                   setSignature('');
                   setComments('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.formButton, 
-                  styles.submitApproveButton,
-                  (!signature || isSubmitting) && styles.formButtonDisabled
-                ]}
-                onPress={handleApprove}
-                disabled={!signature || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                    <Text style={styles.submitButtonText}>Approve</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Rejection Form */}
-        {action === 'reject' && (
-          <View style={styles.formCard}>
-            <View style={styles.formHeader}>
-              <Ionicons name="close-circle" size={20} color="#dc2626" />
-              <Text style={styles.formTitle}>Reject Request</Text>
-            </View>
-            
-            <View style={styles.formSection}>
-              <Text style={styles.formLabel}>
-                Rejection Reason <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter reason for rejection..."
-                placeholderTextColor="#9ca3af"
-                value={rejectionReason}
-                onChangeText={setRejectionReason}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.formSection}>
-              <View style={styles.signatureHeader}>
-                <Text style={styles.formLabel}>
-                  Signature <Text style={styles.required}>*</Text>
-                </Text>
-                <Text style={styles.signatureHint}>
-                  Sign with your finger — it auto-saves when you lift
-                </Text>
-              </View>
-              <View style={styles.signatureContainer}>
-                <SignaturePad
-                  height={180}
-                  value={signature || null}
-                  onSave={(dataUrl) => setSignature(dataUrl)}
-                  onClear={() => setSignature('')}
-                  hideSaveButton
-                  onDrawingStart={() => setIsDrawing(true)}
-                  onDrawingEnd={() => setIsDrawing(false)}
-                />
-              </View>
-            </View>
-
-            <View style={styles.formActions}>
-              <TouchableOpacity
-                style={[styles.formButton, styles.cancelButton]}
-                onPress={() => {
-                  setAction(null);
-                  setSignature('');
                   setRejectionReason('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.formButton, 
-                  styles.submitRejectButton,
-                  (!rejectionReason.trim() || !signature || isSubmitting) && styles.formButtonDisabled
-                ]}
-                onPress={handleReject}
-                disabled={!rejectionReason.trim() || !signature || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="close-circle" size={18} color="#fff" />
-                    <Text style={styles.submitButtonText}>Reject</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Return to Sender Form */}
-        {action === 'return' && (
-          <View style={styles.formCard}>
-            <View style={styles.formHeader}>
-              <Ionicons name="arrow-undo" size={20} color="#f59e0b" />
-              <Text style={styles.formTitle}>Return to Sender</Text>
-            </View>
-            
-            <View style={styles.formSection}>
-              <Text style={styles.formLabel}>
-                Return Reason <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter reason for returning to sender..."
-                placeholderTextColor="#9ca3af"
-                value={returnReason}
-                onChangeText={setReturnReason}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.formSection}>
-              <View style={styles.signatureHeader}>
-                <Text style={styles.formLabel}>
-                  Signature <Text style={styles.required}>*</Text>
-                </Text>
-                <Text style={styles.signatureHint}>
-                  Sign with your finger — it auto-saves when you lift
-                </Text>
-              </View>
-              <View style={styles.signatureContainer}>
-                <SignaturePad
-                  height={180}
-                  value={signature || null}
-                  onSave={(dataUrl) => setSignature(dataUrl)}
-                  onClear={() => setSignature('')}
-                  hideSaveButton
-                  onDrawingStart={() => setIsDrawing(true)}
-                  onDrawingEnd={() => setIsDrawing(false)}
-                />
-              </View>
-            </View>
-
-            <View style={styles.formActions}>
-              <TouchableOpacity
-                style={[styles.formButton, styles.cancelButton]}
-                onPress={() => {
-                  setAction(null);
-                  setSignature('');
                   setReturnReason('');
                 }}
               >
@@ -648,28 +802,77 @@ export default function ReviewScreen() {
               <TouchableOpacity
                 style={[
                   styles.formButton, 
-                  styles.submitReturnButton,
-                  (!returnReason.trim() || !signature || isSubmitting) && styles.formButtonDisabled
+                  action === 'approve' ? styles.submitApproveButton :
+                  action === 'reject' ? styles.submitRejectButton : styles.submitReturnButton,
+                  ((action === 'reject' && !rejectionReason.trim()) ||
+                   (action === 'return' && !returnReason.trim()) ||
+                   !signature || isSubmitting) && styles.formButtonDisabled
                 ]}
-                onPress={handleReturnToSender}
-                disabled={!returnReason.trim() || !signature || isSubmitting}
+                disabled={
+                  (action === 'reject' && !rejectionReason.trim()) ||
+                  (action === 'return' && !returnReason.trim()) ||
+                  !signature || isSubmitting
+                }
+                onPress={async () => {
+                  if (action === 'approve') {
+                    await handleApprove();
+                  } else if (action === 'reject') {
+                    await handleReject();
+                  } else {
+                    await handleReturnToSender();
+                  }
+                }}
               >
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
-                    <Ionicons name="arrow-undo" size={18} color="#fff" />
-                    <Text style={styles.submitButtonText}>Return to Sender</Text>
+                    <Ionicons 
+                      name={action === 'approve' ? 'checkmark-circle' : action === 'reject' ? 'close-circle' : 'arrow-undo'} 
+                      size={18} 
+                      color="#fff" 
+                    />
+                    <Text style={styles.submitButtonText}>
+                      {action === 'approve' ? 'Approve' : action === 'reject' ? 'Reject' : 'Return'}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
             </View>
           </View>
-        )}
+        </View>
+      )}
 
-        {/* Bottom padding for navbar */}
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      {/* Success Modal - Travilink Branding */}
+      {showSuccessModal && (
+        <View style={styles.successModalOverlay}>
+          <TouchableOpacity 
+            style={styles.successModalBackdrop} 
+            activeOpacity={1}
+            onPress={() => {
+              setShowSuccessModal(false);
+              router.back();
+            }}
+          />
+          <View style={styles.successModalContainer}>
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={48} color="#16a34a" />
+            </View>
+            <Text style={styles.successModalTitle}>Success</Text>
+            <Text style={styles.successModalMessage}>{successMessage}</Text>
+            <TouchableOpacity
+              style={styles.successModalButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.back();
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successModalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -683,8 +886,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: 12,
+    paddingBottom: 24,
+  },
+  scrollContentWithAction: {
+    paddingBottom: 100,
   },
   loadingContainer: {
     flex: 1,
@@ -720,77 +926,221 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // Summary Card
-  summaryCard: {
+  // Requester Card - Priority 1
+  requesterCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#7a0019',
-  },
-  summaryHeaderLeft: {
+  requesterHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
+    padding: 12,
+    backgroundColor: '#7a0019',
   },
-  summaryTitle: {
-    fontSize: 18,
+  requesterTitle: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#fff',
   },
-  requestNumberBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  requesterContent: {
+    padding: 12,
+    gap: 12,
   },
-  requestNumberText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  summaryContent: {
-    padding: 16,
-    gap: 16,
-  },
-  summaryRow: {
+  requesterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  summaryRowLeft: {
+  requesterRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  summaryLabel: {
+  requesterLabel: {
     fontSize: 14,
     color: '#6b7280',
     fontWeight: '500',
   },
-  summaryValue: {
+  requesterValue: {
     fontSize: 14,
     color: '#111827',
     fontWeight: '600',
     flex: 1,
     textAlign: 'right',
   },
-  budgetValue: {
-    fontSize: 16,
-    color: '#7a0019',
+  requestNumberValue: {
+    fontSize: 15,
     fontWeight: '700',
+    color: '#7a0019',
+  },
+  // Detail Cards - Matching View Details Design
+  detailCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  detailCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  detailCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  detailCardContent: {
+    gap: 14,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  detailRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  detailRowBorder: {
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  purposeText: {
+    textAlign: 'left',
+    marginTop: 4,
+    fontWeight: '400',
+  },
+  // Signature Display
+  signatureDisplayContainer: {
+    padding: 16,
+    alignItems: 'center',
+    gap: 12,
+  },
+  signatureDisplayImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  signatureDisplayName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  signatureDisplayDate: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  // Participants
+  participantInfo: {
+    flex: 1,
+  },
+  participantHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  participantName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  participantEmail: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  headBadge: {
+    backgroundColor: '#7a0019',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  headBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // Budget Section - Matching View Details Design
+  budgetSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  budgetAmount: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#7a0019',
+    marginBottom: 12,
+  },
+  budgetBreakdown: {
+    gap: 12,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  budgetItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  budgetItemCategory: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  budgetItemDescription: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  budgetItemAmount: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
   },
   // History Card
   historyCard: {
@@ -816,12 +1166,15 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   historyList: {
-    gap: 16,
+    gap: 0,
   },
   historyItem: {
-    paddingBottom: 16,
+    paddingVertical: 12,
+  },
+  historyItemBorder: {
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
+    marginBottom: 12,
   },
   historyItemHeader: {
     flexDirection: 'row',
@@ -880,87 +1233,112 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 80,
   },
-  // Action Selection Card
-  actionSelectionCard: {
+  // Fixed Action Buttons
+  fixedActionContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  actionSelectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
+  fixedActionButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 12,
   },
-  actionButtons: {
-    gap: 12,
-  },
-  actionButton: {
+  fixedActionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 18,
+    padding: 16,
     borderRadius: 12,
-    gap: 12,
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
   },
-  actionButtonIcon: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  approveButton: {
+  fixedApproveButton: {
     backgroundColor: '#16a34a',
   },
-  rejectButton: {
+  fixedRejectButton: {
     backgroundColor: '#dc2626',
   },
-  returnButton: {
+  fixedReturnButton: {
     backgroundColor: '#f59e0b',
   },
-  actionButtonText: {
+  fixedActionButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    flex: 1,
-    textAlign: 'center',
   },
-  // Form Card
-  formCard: {
+  // Action Form Modal
+  actionFormOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  actionFormOverlayBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  actionFormContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    minHeight: 400,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 1001,
   },
-  formHeader: {
+  actionFormHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: '#f3f4f6',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#fff',
   },
-  formTitle: {
+  actionFormTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
+  },
+  closeFormButton: {
+    padding: 4,
+  },
+  actionFormScroll: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  actionFormContent: {
+    padding: 16,
+    backgroundColor: '#fff',
   },
   formSection: {
     marginBottom: 24,
@@ -987,12 +1365,31 @@ const styles = StyleSheet.create({
   },
   signatureHeader: {
     marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   signatureHint: {
     fontSize: 12,
     color: '#6b7280',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  useSavedSignatureButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  useSavedSignatureText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#10b981',
   },
   signatureContainer: {
     borderWidth: 1.5,
@@ -1005,7 +1402,9 @@ const styles = StyleSheet.create({
   formActions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
   },
   formButton: {
     flex: 1,
@@ -1040,5 +1439,83 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  // Success Modal - Travilink Branding
+  successModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2000,
+  },
+  successModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  successModalContainer: {
+    position: 'absolute',
+    top: '30%',
+    left: '10%',
+    right: '10%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#7a0019',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+    borderWidth: 2,
+    borderColor: '#7a0019',
+  },
+  successIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f0fdf4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: '#16a34a',
+  },
+  successModalTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#7a0019',
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  successModalMessage: {
+    fontSize: 16,
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 24,
+    fontWeight: '500',
+  },
+  successModalButton: {
+    backgroundColor: '#7a0019',
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 12,
+    minWidth: 140,
+    shadowColor: '#7a0019',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  successModalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
