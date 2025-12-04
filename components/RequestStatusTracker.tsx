@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RequestStatus } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
@@ -206,13 +206,7 @@ export default function RequestStatusTracker({
             />
           </View>
         </View>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={true}
-          contentContainerStyle={styles.compactContainer}
-          style={styles.compactContainerScroll}
-          nestedScrollEnabled={true}
-        >
+        <View style={styles.compactContainer}>
           {activeStages.map((stage, idx) => {
             const stageStatus = getStageStatus(stage.key);
             const isLast = idx === activeStages.length - 1;
@@ -221,29 +215,34 @@ export default function RequestStatusTracker({
             
             return (
               <React.Fragment key={stage.key}>
-                <View
-                  style={[
-                    styles.compactIcon,
-                    stageStatus === 'completed' && styles.compactIconCompleted,
-                    stageStatus === 'current' && styles.compactIconCurrent,
-                    stageStatus === 'rejected' && styles.compactIconRejected,
-                    isSkipped && styles.compactIconSkipped,
-                  ]}
-                >
-                  {stageStatus === 'completed' && (
-                    <Ionicons name="checkmark" size={14} color="#fff" />
-                  )}
-                  {stageStatus === 'current' && (
-                    <Ionicons name="time" size={14} color="#fff" />
-                  )}
-                  {stageStatus === 'rejected' && (
-                    <Ionicons name="close" size={14} color="#fff" />
-                  )}
+                <View style={styles.compactStageWrapper}>
+                  <View
+                    style={[
+                      styles.compactIcon,
+                      stageStatus === 'completed' && styles.compactIconCompleted,
+                      stageStatus === 'current' && styles.compactIconCurrent,
+                      stageStatus === 'rejected' && styles.compactIconRejected,
+                      isSkipped && styles.compactIconSkipped,
+                    ]}
+                  >
+                    {stageStatus === 'completed' && (
+                      <Ionicons name="checkmark" size={11} color="#fff" />
+                    )}
+                    {stageStatus === 'current' && (
+                      <Ionicons name="time" size={11} color="#fff" />
+                    )}
+                    {stageStatus === 'rejected' && (
+                      <Ionicons name="close" size={11} color="#fff" />
+                    )}
+                    {isSkipped && (
+                      <Ionicons name="remove" size={11} color="#9ca3af" />
+                    )}
+                    {stageStatus === 'pending' && !isSkipped && (
+                      <Ionicons name={stage.icon} size={11} color="#9ca3af" />
+                    )}
+                  </View>
                   {isSkipped && (
-                    <Ionicons name="remove" size={14} color="#9ca3af" />
-                  )}
-                  {stageStatus === 'pending' && !isSkipped && (
-                    <Ionicons name={stage.icon} size={14} color="#9ca3af" />
+                    <Text style={styles.compactSkippedLabel}>SKIP</Text>
                   )}
                 </View>
                 {!isLast && (
@@ -258,7 +257,7 @@ export default function RequestStatusTracker({
               </React.Fragment>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
     );
   }
@@ -433,22 +432,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
     borderRadius: 2,
   },
-  compactContainerScroll: {
-    width: '100%',
-  },
   compactContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 2,
     gap: 0,
-    minWidth: 400, // Minimum width to show all 7 stages: (32px icon + 28px connector) * 7 ≈ 400px
+    width: '100%',
+  },
+  compactStageWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 24,
   },
   compactIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
@@ -459,6 +460,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  compactSkippedLabel: {
+    fontSize: 7,
+    fontWeight: '700',
+    color: '#9ca3af',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   compactIconCompleted: {
     backgroundColor: '#16a34a',
@@ -484,12 +493,12 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   compactConnector: {
-    width: 24,
-    height: 3,
+    height: 2,
     backgroundColor: '#e5e7eb',
-    marginHorizontal: 2,
-    flexShrink: 0,
-    borderRadius: 1.5,
+    flex: 1,
+    minWidth: 8,
+    maxWidth: 12,
+    borderRadius: 1,
   },
   compactConnectorCompleted: {
     backgroundColor: '#16a34a',
