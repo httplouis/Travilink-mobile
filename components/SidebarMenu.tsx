@@ -24,7 +24,7 @@ interface SidebarMenuProps {
 }
 
 export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, signOut } = useAuth();
   const slideAnim = React.useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [shouldRender, setShouldRender] = React.useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -81,6 +81,15 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
       console.error('[SidebarMenu] Error updating availability:', error);
     } finally {
       setUpdatingAvailability(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    onClose();
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('[SidebarMenu] Error signing out:', error);
     }
   };
 
@@ -249,24 +258,15 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
             ))}
           </View>
 
-          {/* Footer */}
+          {/* Footer - Sign Out Button */}
           <View style={styles.footer}>
             <TouchableOpacity
-              style={styles.footerButton}
-              onPress={() => handleNavigate('/feedback')}
+              style={styles.signOutButton}
+              onPress={handleSignOut}
               activeOpacity={0.7}
             >
-              <Ionicons name="star-outline" size={18} color="#6b7280" />
-              <Text style={styles.footerButtonText}>Feedback</Text>
-            </TouchableOpacity>
-            <View style={styles.footerDivider} />
-            <TouchableOpacity
-              style={styles.footerButton}
-              onPress={() => handleNavigate('/profile/settings')}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
-              <Text style={styles.footerButtonText}>About</Text>
+              <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+              <Text style={styles.signOutButtonText}>Sign Out</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -423,29 +423,26 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     backgroundColor: '#f9fafb',
   },
-  footerButton: {
+  signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  footerButtonText: {
-    fontSize: 13,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  footerDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#e5e7eb',
+  signOutButtonText: {
+    fontSize: 16,
+    color: '#dc2626',
+    fontWeight: '600',
   },
 });
