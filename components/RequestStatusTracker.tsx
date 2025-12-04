@@ -237,7 +237,7 @@ export default function RequestStatusTracker({
             <Text style={styles.rejectedTitle}>Request Rejected</Text>
             <Text style={styles.rejectedSubtitle}>
               Rejected at {rejectionStage || 'unknown'} stage
-              {rejectedBy && ` by ${rejectedBy}`}
+              {rejectedBy ? ` by ${rejectedBy}` : ''}
             </Text>
           </View>
         </View>
@@ -332,12 +332,12 @@ export default function RequestStatusTracker({
                     )}
                     {stageStatus === 'completed' && approverName && (
                       <Text style={styles.timelineApproverName}>
-                        Approved by {approverName}
+                        Approved by {approverName || 'Unknown'}
                       </Text>
                     )}
                     {stageStatus === 'completed' && getApprovalTimestamp(stage.key) && (
                       <Text style={styles.timelineApprovalTime}>
-                        {formatDateTime(getApprovalTimestamp(stage.key)!)}
+                        {formatDateTime(getApprovalTimestamp(stage.key) || '')}
                       </Text>
                     )}
                   </View>

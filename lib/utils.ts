@@ -122,6 +122,18 @@ export function formatCurrency(amount: number | null | undefined): string {
 }
 
 /**
+ * Safely convert any value to a string for rendering in Text components
+ * Prevents "Text strings must be rendered within a <Text> component" errors
+ */
+export function safeText(value: any): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return String(value);
+  return String(value);
+}
+
+/**
  * Check if user is comptroller based on email
  */
 export function isComptroller(email: string | null | undefined): boolean {

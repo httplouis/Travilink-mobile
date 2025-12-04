@@ -97,12 +97,12 @@ export default function InboxRequestCard({ request, role, onPress }: InboxReques
                 </Text>
               </View>
               <View style={styles.requesterInfo}>
-                <Text style={styles.requesterName}>{request.requester_name}</Text>
+                <Text style={styles.requesterName}>{request.requester_name || 'Unknown Requester'}</Text>
                 <View style={styles.departmentRow}>
                   <Ionicons name="business-outline" size={12} color="#6b7280" />
                   <Text style={styles.department}>
                     {request.department?.name || 'N/A'}
-                    {request.department?.code && ` (${request.department.code})`}
+                    {request.department?.code ? ` (${request.department.code})` : ''}
                   </Text>
                 </View>
               </View>
@@ -110,7 +110,7 @@ export default function InboxRequestCard({ request, role, onPress }: InboxReques
 
             <View style={styles.destinationSection}>
               <Ionicons name="location-outline" size={16} color="#7a0019" />
-              <Text style={styles.destination} numberOfLines={2}>{request.destination}</Text>
+              <Text style={styles.destination} numberOfLines={2}>{request.destination || 'No destination'}</Text>
             </View>
 
             <View style={styles.datesRow}>
@@ -146,7 +146,7 @@ export default function InboxRequestCard({ request, role, onPress }: InboxReques
                   <Text style={styles.budgetLabel}>Budget</Text>
                 </View>
                 <View style={styles.budgetAmountContainer}>
-                  <Text style={styles.budgetAmount}>₱{request.total_budget.toLocaleString()}</Text>
+                  <Text style={styles.budgetAmount}>₱{request.total_budget ? request.total_budget.toLocaleString() : '0'}</Text>
                   {request.total_budget >= 15000 && (
                     <View style={styles.highBudgetBadge}>
                       <Ionicons name="trending-up" size={10} color="#dc2626" />

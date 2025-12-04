@@ -54,13 +54,13 @@ export default function RequestCard({
         <View style={styles.detailRow}>
           <Ionicons name="location" size={16} color="#6b7280" />
           <Text style={styles.detailText} numberOfLines={1}>
-            {request.destination}
+            {request.destination || 'No destination'}
           </Text>
         </View>
         <View style={styles.detailRow}>
           <Ionicons name="calendar" size={16} color="#6b7280" />
           <Text style={styles.detailText}>
-            {formatDate(request.travel_start_date)}
+            {request.travel_start_date ? formatDate(request.travel_start_date) : 'No date'}
           </Text>
         </View>
         {request.total_budget && (
