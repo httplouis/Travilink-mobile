@@ -788,23 +788,56 @@ export default function TravelOrderScreen() {
         );
       }
 
-      // Upload attachments if any
+      // Upload attachments if any - handle errors gracefully with individual file handling
       let uploadedAttachments: any[] = [];
       if (attachments.length > 0 && status === 'submitted') {
-        try {
-          // Upload files to storage (we'll update with request ID after creation)
-          uploadedAttachments = await uploadFilesToStorage(attachments, profile.id);
-        } catch (uploadError: any) {
-          console.error('Error uploading attachments:', uploadError);
-          Alert.alert(
-            'Upload Error',
-            'Failed to upload some attachments. Do you want to continue without them?',
-            [
-              { text: 'Cancel', style: 'cancel', onPress: () => { setSubmitting(false); return; } },
-              { text: 'Continue', onPress: () => {} },
-            ]
-          );
-          // Continue without attachments if user chooses
+        const uploadResults: Array<{ success: boolean; file: any; error?: any }> = [];
+        
+        // Upload each file individually to handle partial failures
+        for (const file of attachments) {
+          try {
+            const { uploadFileToStorage } = await import('@/lib/storage');
+            const uploaded = await uploadFileToStorage(file, profile.id);
+            uploadResults.push({ success: true, file: uploaded });
+            uploadedAttachments.push(uploaded);
+          } catch (fileError: any) {
+            console.error(`[TravelOrder] ❌ Failed to upload file "${file.name}":`, fileError?.message || fileError);
+            uploadResults.push({ success: false, file, error: fileError });
+          }
+        }
+        
+        // Check if any files failed to upload
+        const failedFiles = uploadResults.filter(r => !r.success);
+        if (failedFiles.length > 0) {
+          // Show error and ask if user wants to continue
+          const shouldContinue = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Upload Error',
+              `Failed to upload ${failedFiles.length} of ${attachments.length} attachment(s). Do you want to continue without them?`,
+              [
+                { 
+                  text: 'Cancel', 
+                  style: 'cancel', 
+                  onPress: () => {
+                    setSubmitting(false);
+                    resolve(false);
+                  }
+                },
+                { 
+                  text: 'Continue', 
+                  onPress: () => resolve(true)
+                },
+              ]
+            );
+          });
+          
+          if (!shouldContinue) {
+            return; // User cancelled - submission is already stopped
+          }
+          // Continue with successfully uploaded attachments only
+          console.log(`[TravelOrder] ⚠️ Continuing with ${uploadedAttachments.length} successfully uploaded attachment(s)`);
+        } else {
+          console.log('[TravelOrder] ✅ Successfully uploaded', uploadedAttachments.length, 'attachment(s)');
         }
       }
 

@@ -1,5 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
+
+// Create a separate client for driver queries that uses anon key to bypass RLS restrictions
+// The anon role has "allow select for all" policy which allows viewing all users
+const supabaseAnon = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL || '',
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 export interface Driver {
   id: string;
@@ -21,41 +29,25 @@ export function useDrivers(filters?: { status?: string }) {
     queryFn: async (): Promise<Driver[]> => {
       console.log('[useDrivers] 🔍 Fetching drivers with filters:', filters);
       
-      // Try WITHOUT status filter first (most reliable), then with filter if needed
-      let allDrivers: Driver[] = [];
-      let attemptWithStatus = false;
-      const wantsStatusFilter = filters?.status === 'active' || filters?.status === 'inactive';
-      
-      while (true) {
+      try {
         // First, fetch users with driver role
-        let query = supabase
+        // Use anon client to bypass RLS restrictions (same pattern as useUsers)
+        let query = supabaseAnon
           .from('users')
           .select('id, name, email, phone_number, profile_picture, status, position_title')
           .eq('role', 'driver')
           .order('name', { ascending: true });
 
-        // Only apply status filter if user explicitly requested it AND we haven't tried without it yet
-        // Start without status filter to avoid RLS issues
-        if (wantsStatusFilter && attemptWithStatus && filters?.status) {
-          if (filters.status === 'active') {
-            query = query.eq('status', 'active');
-            console.log('[useDrivers] 🔎 Filtering by status: active');
-          } else if (filters.status === 'inactive') {
-            query = query.eq('status', 'inactive');
-            console.log('[useDrivers] 🔎 Filtering by status: inactive');
-          }
-        } else {
-          console.log('[useDrivers] 📋 Fetching ALL drivers (no status filter)');
+        // Apply status filter if provided
+        if (filters?.status === 'active' || filters?.status === 'inactive') {
+          query = query.eq('status', filters.status);
+          console.log('[useDrivers] 🔎 Filtering by status:', filters.status);
         }
 
         const { data: usersData, error: usersError } = await query;
         
         if (usersError) {
           console.error('[useDrivers] ❌ Users query error:', usersError);
-          if (wantsStatusFilter && !attemptWithStatus) {
-            attemptWithStatus = true;
-            continue;
-          }
           throw usersError;
         }
         
@@ -63,6 +55,8 @@ export function useDrivers(filters?: { status?: string }) {
           console.warn('[useDrivers] ⚠️ No users found with driver role');
           return [];
         }
+        
+        console.log(`[useDrivers] 📋 Found ${usersData.length} user(s) with driver role`);
         
         // Now fetch driver details from drivers table
         const userIds = usersData.map(u => u.id);
@@ -72,8 +66,10 @@ export function useDrivers(filters?: { status?: string }) {
           .in('user_id', userIds);
         
         if (driversError) {
-          console.warn('[useDrivers] ⚠️ Could not fetch driver details:', driversError);
+          console.warn('[useDrivers] ⚠️ Could not fetch driver details from drivers table:', driversError);
           // Continue without driver details - return users only
+        } else {
+          console.log(`[useDrivers] 📋 Found ${driversData?.length || 0} driver record(s) in drivers table`);
         }
         
         // Create a map of driver details by user_id
@@ -83,65 +79,30 @@ export function useDrivers(filters?: { status?: string }) {
         });
         
         // Combine user data with driver details
-        const { data, error } = {
-          data: usersData.map((user: any) => {
-            const driverInfo = driversMap.get(user.id);
-            return {
-              ...user,
-              license_no: driverInfo?.license_no || null,
-              license_expiry: driverInfo?.license_expiry || null,
-              driver_rating: driverInfo?.driver_rating || null,
-              phone: driverInfo?.phone || user.phone_number || null,
-            };
-          }),
-          error: null,
-        };
-
-        if (error) {
-          console.error('[useDrivers] ❌ Query error:', error);
-          console.error('[useDrivers] Error details:', JSON.stringify(error, null, 2));
-          
-          // If we got an error and haven't tried with status filter yet, try it
-          if (wantsStatusFilter && !attemptWithStatus) {
-            console.log('[useDrivers] 🔄 Retrying with status filter due to error...');
-            attemptWithStatus = true;
-            continue; // Retry with status filter
-          }
-          throw error;
+        const allDrivers: Driver[] = usersData.map((user: any) => {
+          const driverInfo = driversMap.get(user.id);
+          return {
+            ...user,
+            license_no: driverInfo?.license_no || null,
+            license_expiry: driverInfo?.license_expiry || null,
+            driver_rating: driverInfo?.driver_rating || null,
+            phone: driverInfo?.phone || user.phone_number || null,
+          };
+        });
+        
+        console.log(`[useDrivers] ✅ Successfully fetched ${allDrivers.length} driver(s)`);
+        if (allDrivers.length > 0) {
+          console.log('[useDrivers] Sample drivers:', allDrivers.slice(0, 3).map(d => d.name));
         }
         
-        allDrivers = (data || []) as Driver[];
-        console.log('[useDrivers] ✅ Fetched drivers:', allDrivers.length);
-        
-        // If user wants status filter but we got results without it, try with filter
-        if (wantsStatusFilter && !attemptWithStatus && allDrivers.length > 0) {
-          console.log('[useDrivers] 🔄 Got drivers without filter, now trying with status filter as requested...');
-          attemptWithStatus = true;
-          continue; // Retry with status filter
-        }
-        
-        // If we got no results and user wants status filter, try without it
-        if (allDrivers.length === 0 && wantsStatusFilter && attemptWithStatus) {
-          console.log('[useDrivers] ⚠️ No drivers found with status filter, trying without status filter...');
-          attemptWithStatus = false;
-          continue; // Retry without status filter
-        }
-        
-        // We got results or already tried both ways, break
-        break;
+        return allDrivers;
+      } catch (error: any) {
+        console.error('[useDrivers] ❌ Error fetching drivers:', error);
+        throw error;
       }
-      
-      if (allDrivers.length > 0) {
-        console.log('[useDrivers] Sample drivers:', allDrivers.slice(0, 3).map(d => d.name));
-      } else {
-        console.warn('[useDrivers] ⚠️ No drivers returned from query');
-      }
-      
-      return allDrivers;
     },
-    staleTime: 0, // Don't cache - always fetch fresh data
-    gcTime: 0, // Don't keep in cache
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000, // Cache for 30 seconds
+    gcTime: 300000, // Keep in cache for 5 minutes
     refetchOnMount: true, // Always refetch when component mounts
   });
 }

@@ -159,17 +159,13 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
             },
           ]}
         >
-          {/* Logo Header */}
-          <View style={styles.logoHeader}>
-            <Image
-              source={require('@/assets/travelink.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </View>
-
           {/* Profile Header - Teams-inspired */}
           <View style={styles.profileHeader}>
+            <View style={styles.profileHeaderTop}>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               onPress={() => {
                 handleNavigate('/profile');
@@ -198,9 +194,6 @@ export default function SidebarMenu({ visible, onClose }: SidebarMenuProps) {
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
           </View>
 
@@ -300,27 +293,17 @@ const styles = StyleSheet.create({
     elevation: 10,
     justifyContent: 'space-between',
   },
-  logoHeader: {
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f9fafb',
-  },
-  logoImage: {
-    width: 80,
-    height: 80,
-  },
   profileHeader: {
-    padding: 20,
-    paddingTop: 20,
+    padding: 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 35,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+  },
+  profileHeaderTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   profileSection: {
     flexDirection: 'row',

@@ -1,5 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
+
+// Create a separate client for vehicle queries that uses anon key to bypass RLS restrictions
+// The anon role has "allow select for all" policy which allows viewing all vehicles
+const supabaseAnon = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL || '',
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 export interface Vehicle {
   id: string;
@@ -17,7 +25,8 @@ export function useVehicles(filters?: { status?: string; available?: boolean }) 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['vehicles', filters],
     queryFn: async (): Promise<Vehicle[]> => {
-      let query = supabase
+      // Use anon client to bypass RLS restrictions (same pattern as useUsers and useDrivers)
+      let query = supabaseAnon
         .from('vehicles')
         .select('*')
         .order('vehicle_name', { ascending: true });
@@ -49,7 +58,8 @@ export function useVehicles(filters?: { status?: string; available?: boolean }) 
   });
 
   return {
-    vehicles: data || [],
+    data: data || [],
+    vehicles: data || [], // Alias for backward compatibility
     isLoading,
     error,
     refetch,

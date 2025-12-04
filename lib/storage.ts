@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { supabase } from './supabase/client';
 import { AttachmentFile } from '@/components/FileAttachmentPicker';
@@ -29,9 +29,9 @@ export async function uploadFileToStorage(
       throw new Error('File URI is missing');
     }
     
-    // Read file as base64 - use the correct encoding type
+    // Read file as base64 - use string literal 'base64' (EncodingType may not be available)
     const base64 = await FileSystem.readAsStringAsync(file.uri, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: 'base64',
     });
 
     // Generate unique file name
