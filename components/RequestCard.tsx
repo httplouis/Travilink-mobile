@@ -166,6 +166,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
+    flex: 1,
+    marginRight: 8,
   },
   feedbackBadge: {
     flexDirection: 'row',
@@ -185,6 +187,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
+    flexShrink: 1,
+    marginRight: 4,
   },
   title: {
     fontSize: 15,
