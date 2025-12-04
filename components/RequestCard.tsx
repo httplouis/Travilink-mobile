@@ -22,7 +22,13 @@ export default function RequestCard({
   needsFeedback = false,
 }: RequestCardProps) {
   const hasParentHead = !!request.parent_department_id;
-  const requiresPresidentApproval = (request.total_budget || 0) > 50000;
+  // President approval logic:
+  // - Heads always go to President (always true)
+  // - Faculty: only if budget >= 15,000
+  const isFaculty = !request.requester_is_head;
+  const requiresPresidentApproval = request.requester_is_head 
+    ? true // Heads always go to President
+    : (request.total_budget || 0) >= 15000; // Faculty: only if budget >= 15k
 
   return (
     <TouchableOpacity 

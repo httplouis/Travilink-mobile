@@ -96,7 +96,7 @@ export default function RequestDetailsScreen() {
   // Heads always go to President regardless of budget
   const isFaculty = !request?.requester_is_head;
   const requiresPresidentApproval = isFaculty 
-    ? (request?.total_budget || 0) > 15000 
+    ? (request?.total_budget || 0) >= 15000  // Faculty: only if budget >= 15k
     : true; // Heads always go to President
   
   // Get approver names from tracking data
