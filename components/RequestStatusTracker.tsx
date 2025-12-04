@@ -208,9 +208,10 @@ export default function RequestStatusTracker({
         </View>
         <ScrollView 
           horizontal 
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={true}
           contentContainerStyle={styles.compactContainer}
           style={styles.compactContainerScroll}
+          nestedScrollEnabled={true}
         >
           {activeStages.map((stage, idx) => {
             const stageStatus = getStageStatus(stage.key);
@@ -433,16 +434,16 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   compactContainerScroll: {
-    flexGrow: 0,
+    width: '100%',
   },
   compactContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingVertical: 4,
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     gap: 0,
-    minWidth: '100%',
+    minWidth: 400, // Minimum width to show all 7 stages: (32px icon + 28px connector) * 7 ≈ 400px
   },
   compactIcon: {
     width: 32,
