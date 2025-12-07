@@ -1,41 +1,57 @@
-# 🚀 TraveLink Mobile
+# Travelink
 
-> Mobile application for TraveLink - Smart Campus Transport System
+> A comprehensive travel order and seminar application management system for Manuel S. Enverga University Foundation (MSEUF) - Mobile Application
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-travilink.vercel.app-blue)](https://travilink.vercel.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue)](https://www.typescriptlang.org/)
 [![React Native](https://img.shields.io/badge/React%20Native-Expo-61DAFB)](https://expo.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E)](https://supabase.com/)
 
 ---
 
-## 📌 About
+## Overview
 
-TraveLink Mobile is a cross-platform mobile application built with **React Native (Expo)**, **TypeScript**, and **Supabase**. It provides faculty and staff with a mobile interface to view their transportation requests, track approval status, view their schedule, and receive real-time notifications.
+Travelink Mobile is a smart mobile application designed to streamline and automate the entire travel order request process for MSEUF. The mobile app provides faculty and staff with on-the-go access to submit requests, track approval workflows, view schedules, manage vehicle/driver assignments, and provide post-trip feedback.
 
----
-
-## ✨ Features
-
-### Core Features
-- ✅ **Authentication** - Secure sign-in with Supabase Auth
-- ✅ **My Papers (Submissions)** - View all submitted requests with real-time updates
-- ✅ **Request Details** - Full request information with approval timeline
-- ✅ **Schedule/Calendar** - View approved trips and availability
-- ✅ **Notifications** - Real-time notifications for request updates
-- ✅ **Real-time Sync** - Live updates via Supabase Realtime
-
-### Advanced Features
-- ✅ **Request Submission** - Create new Travel Order and Seminar requests
-- ✅ **PDF Download** - Download request PDFs with proper formatting
-- ✅ **Duplicate Request** - Duplicate existing requests to create new drafts
-- ✅ **Return to Sender** - Edit and resubmit returned requests
-- ✅ **Signature Pad** - Draw or upload signatures
-- ✅ **Map Picker** - Interactive location selection with search
-- ✅ **Head Endorsement** - Send invitation emails for endorsements
+Built with **React Native (Expo)**, **TypeScript**, and **Supabase**, the mobile app offers full feature parity with the web version while providing an optimized mobile experience.
 
 ---
 
-## 🚀 Quick Start
+## Key Features
+
+### 🚗 Request Management
+Submit and track travel orders and seminar applications with budget tracking. Create new requests, duplicate existing ones, and manage drafts directly from your mobile device.
+
+### ✅ Multi-Level Approval Workflow
+Automated routing through Department Head → Admin → Comptroller → HR → Executive. Real-time tracking of approval status with detailed timeline and approver information.
+
+### 🚐 Vehicle & Driver Assignment
+Intelligent assignment based on availability and requirements. View assigned vehicles and drivers for approved requests.
+
+### 📍 Real-Time Tracking
+Live updates on request status and approval progress. Receive instant notifications for status changes, approvals, and rejections.
+
+### 📅 Schedule & Calendar
+View approved trips and availability in an intuitive calendar interface. Track your travel schedule and manage bookings.
+
+### ✍️ Signature Management
+Draw or upload signatures directly from your mobile device. Manage signature settings and use them for request submissions.
+
+### 🗺️ Map Integration
+Interactive location selection with search and autocomplete. Pick destinations using an integrated map picker powered by OpenStreetMap.
+
+### 📄 PDF Download
+Download request PDFs with proper formatting. Access documents on-the-go with offline viewing capabilities.
+
+### 🔔 Notifications
+Real-time notifications for request updates, approvals, and important announcements. Stay informed about your requests anytime, anywhere.
+
+### 💬 Feedback System
+Post-trip feedback collection with ratings and reviews. Evaluate completed trips and provide valuable feedback.
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
@@ -52,7 +68,7 @@ TraveLink Mobile is a cross-platform mobile application built with **React Nativ
 1. **Clone the repository**
    ```bash
    git clone https://github.com/httplouis/Travilink-mobile.git
-   cd TraveLink-mobile
+   cd Travilink-mobile
    ```
 
 2. **Install dependencies**
@@ -90,10 +106,10 @@ TraveLink Mobile is a cross-platform mobile application built with **React Nativ
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-TraveLink-mobile/
+Travilink-mobile/
 ├── app/                    # Expo Router app directory
 │   ├── (auth)/            # Authentication screens
 │   ├── (tabs)/            # Main app tabs
@@ -128,9 +144,9 @@ TraveLink-mobile/
 
 ---
 
-## 🔑 Key Technologies
+## Technology Stack
 
-### Core Stack
+### Core Technologies
 - **React Native** - Mobile framework
 - **Expo** - Development platform and tooling
 - **TypeScript** - Type-safe JavaScript
@@ -150,7 +166,7 @@ TraveLink-mobile/
 
 ---
 
-## 🔌 API Integration
+## API Integration
 
 ### Supabase (Primary Backend)
 - Direct database connection with Row Level Security (RLS)
@@ -163,14 +179,14 @@ TraveLink-mobile/
    - Used for map picker search/autocomplete
    - Endpoint: `https://nominatim.openstreetmap.org/`
 
-2. **TraviLink Web API** - Backend API endpoints
+2. **Travelink Web API** - Backend API endpoints
    - PDF Generation: `GET /api/requests/[id]/pdf`
    - Duplicate Request: `POST /api/requests/[id]/duplicate`
    - Head Endorsement Invitations: `POST /api/head-endorsements/invite`
 
 ---
 
-## 🛠️ Development
+## Development
 
 ### Common Commands
 
@@ -203,16 +219,9 @@ expo build:android
 eas build --platform android
 ```
 
-### Debugging
-
-- **Expo DevTools** - Built-in debugging tools (opens automatically)
-- **React Native Debugger** - Standalone debugging app
-- **Console logs** - Check terminal for logs
-- **React DevTools** - Browser extension for React debugging
-
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -253,29 +262,11 @@ npm start -- --clear
 ```
 </details>
 
-<details>
-<summary><b>Authentication Issues</b></summary>
-
-- Clear Secure Store: Uninstall and reinstall app
-- Check Supabase Auth settings
-- Verify user exists in `users` table
-- Check console for auth errors
-</details>
-
-<details>
-<summary><b>Real-time Not Working</b></summary>
-
-- Check Supabase Realtime is enabled in project settings
-- Verify RLS policies allow SELECT operations
-- Check network connectivity
-- Restart the app
-</details>
-
 > For more troubleshooting tips, see [`docs/`](docs/) folder.
 
 ---
 
-## 📝 Environment Variables
+## Environment Variables
 
 ### Required
 ```env
@@ -293,7 +284,7 @@ EXPO_PUBLIC_WEB_APP_URL=https://travilink.example.com
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 All additional documentation is organized in the [`docs/`](docs/) folder:
 
@@ -307,7 +298,7 @@ All additional documentation is organized in the [`docs/`](docs/) folder:
 
 ---
 
-## 🎯 Current Status
+## Current Status
 
 ### ✅ Completed Features
 
@@ -320,6 +311,7 @@ All additional documentation is organized in the [`docs/`](docs/) folder:
 - ✅ Signature Management
 - ✅ Map Integration
 - ✅ Head Endorsement System
+- ✅ Feedback Collection
 
 ### 🚧 In Progress
 
@@ -328,22 +320,22 @@ All additional documentation is organized in the [`docs/`](docs/) folder:
 
 ---
 
-## 📄 License
+## License
 
-**Private** - TraviLink Project
+**MIT License** - Travelink Project
 
 ---
 
-## 👥 Team
+## Team
 
-**TraviLink Development Team**
+**Travelink Development Team**
 - [@Gaboogsh](https://github.com/Gaboogsh)
 - [@httplouis](https://github.com/httplouis)
 - [@Hans-Madridano25](https://github.com/Hans-Madridano25)
 
 ---
 
-## 📞 Support
+## Support
 
 For issues or questions:
 
@@ -354,17 +346,7 @@ For issues or questions:
 
 ---
 
-## 🔄 Changelog
-
-### v1.0.0
-- Initial release with core viewing features
-- Request submission functionality
-- Real-time updates and notifications
-- Full feature parity with web version
-
----
-
-## 🔗 Additional Resources
+## Additional Resources
 
 - [Expo Documentation](https://docs.expo.dev/)
 - [React Native Documentation](https://reactnative.dev/)
@@ -375,6 +357,6 @@ For issues or questions:
 
 <div align="center">
 
-**Made with ❤️ by the TraviLink Team**
+**Made with ❤️ by the Travelink Team**
 
 </div>
